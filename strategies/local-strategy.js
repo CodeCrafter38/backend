@@ -1,6 +1,6 @@
 import { Strategy } from "passport-local";
 import bcrypt from "bcrypt";
-import { findUserByEmail } from "../users.js";
+import { findUserByEmail } from "../helpers.js";
 
 export default function initialize(passport) {
   passport.use(
@@ -16,7 +16,7 @@ export default function initialize(passport) {
           throw new Error("Incorrect username or password");
         }
       } catch (e) {
-        done(e);
+        done(e, null);
       }
     })
   );

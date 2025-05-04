@@ -1,6 +1,6 @@
 import express from "express";
-import { getPosts } from "../database.js";
-import { findUserByName, addPost } from "../helpers.js";
+import {} from "../database.js";
+import {} from "../helpers.js";
 
 const router = express.Router();
 
