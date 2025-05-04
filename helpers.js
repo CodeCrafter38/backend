@@ -19,7 +19,12 @@ export async function findUserByName(username) {
 }
 
 export async function addUser(username, email, password, role) {
-  await queries.createUser(username, email, password, role);
+  const user = await queries.createUser(username, email, password, role);
+  if (!user) {
+    throw new Error("Failed to create new user!");
+  } else {
+    return user;
+  }
 }
 
 export async function addPost(

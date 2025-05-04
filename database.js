@@ -125,19 +125,16 @@ export async function getUserByEmail(email) {
 
 export async function createUser(username, email, password, role) {
   const connection = await pool.getConnection();
-  await connection.beginTransaction();
   try {
     const [result] = await connection.query(
       `INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)`,
       [username, email, password, role]
     );
+    connection.release();
     const id = result.insertId;
     return await getUserById(id);
   } catch (e) {
-    await connection.rollback();
-    throw e;
-  } finally {
-    connection.release();
+    throw new Error(e.message);
   }
 }
 

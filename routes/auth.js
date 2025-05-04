@@ -14,8 +14,12 @@ router.post("/signup", async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(password, 10);
-  await addUser(username, email, hashed, role);
-  res.json({ msg: "User created successfully" });
+  const createdUser = await addUser(username, email, hashed, role);
+  if (createdUser) {
+    res.json({ msg: "User created successfully" });
+  } else {
+    res.json({ msg: "Failed to create user" });
+  }
 });
 
 router.post(
