@@ -1,15 +1,13 @@
 import express from "express";
-import {} from "../database.js";
-import {} from "../helpers.js";
+import { createComment, getComments } from "../database.js";
+import { findUserByName } from "../helpers.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-  // console.log("Session in posts:\n", req.session);
-  // console.log("Session id in posts:\n", req.session.id);
   if (req.isAuthenticated()) {
-    const posts = await getPosts();
-    res.json(posts);
+    const comments = await getComments();
+    res.json(comments);
   } else {
     return res.status(401).send({ msg: "You are not authenticated" });
   }
@@ -17,12 +15,12 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   if (req.isAuthenticated()) {
-    const { title, content, userName, isPublic, selectedGroups } = req.body;
+    const { postId, userName, content } = req.body;
     const user = await findUserByName(userName);
     const userId = user.id;
     if (userId) {
-      await addPost(title, content, userId, isPublic, selectedGroups);
-      res.json({ msg: "Post created in the given groups" });
+      const comment = await createComment(content, postId, userId);
+      res.json({ msg: "Comment added to the given post" }, comment);
     } else {
       return res.status(400).json({ msg: "Given user does not exist" });
     }

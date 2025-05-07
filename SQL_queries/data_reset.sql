@@ -10,8 +10,9 @@ DELETE FROM user_groups;
 -- Clear core tables (order does matter due to foreign key dependencies)
 DELETE FROM comments;
 DELETE FROM posts;
-DELETE FROM groups;
+DELETE FROM groups_nexus;
 DELETE FROM users;
+DELETE FROM sessions;
 
 -- Re-enable foreign key checks
 SET FOREIGN_KEY_CHECKS = 1;

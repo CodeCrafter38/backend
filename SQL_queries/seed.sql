@@ -1,11 +1,10 @@
 USE nexus_db;
 
-
 INSERT INTO users (username, email, password, role)
 VALUES 
-  ('alice', 'alice@example.com', 'hashed_pw_1', 'ADMIN'),
-  ('jay', 'jay@example.com', 'hashed_pw_2', 'STUDENT'),
-  ('bob', 'bob@example.com', 'hashed_pw_3', 'TEACHER');
+  ('alice', 'alice@example.com', '$2a$12$62TYYx8DfJF3e1l4oA6p/OOMV/qaqjble1EXXTs1OYuVNEvClV3j6', 'ADMIN'),
+  ('jay', 'jay@example.com', '$2a$12$yRUd9RelLLNGEBmnApgi6.qVhXWxk3q258lIjfIN2dCgVHvcmffMG', 'STUDENT'),
+  ('bob', 'bob@example.com', '$2a$12$hWL/JwZuJ6K1NvS/fDOvvePicIUumP0nyu6PBltOBDOnTgsvBPdQu', 'TEACHER');
 
 
 INSERT INTO groups_nexus (name, description, created_by)

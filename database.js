@@ -147,3 +147,34 @@ export async function getGroupsOfUser(userId) {
   connection.release();
   return rows;
 }
+
+export async function createComment(content, postId, userId) {
+  const connection = await pool.getConnection();
+  try {
+    const [result] = await connection.query(
+      `INSERT INTO comments (content, post_id, user_id) VALUES (?, ?, ?)`,
+      [content, postId, userId]
+    );
+    connection.release();
+    const id = result.insertId;
+    return await getCommentById(id);
+  } catch (e) {
+    throw new Error(e.message);
+  }
+}
+
+export async function getComments() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query("SELECT * FROM comments");
+  connection.release();
+  return rows;
+}
+
+export async function getCommentById(id) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(`SELECT * FROM comments WHERE id = ?`, [
+    id,
+  ]);
+  connection.release();
+  return rows[0];
+}
