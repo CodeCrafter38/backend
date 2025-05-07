@@ -10,15 +10,15 @@ router.post("/signup", async (req, res) => {
 
   const foundUser = await findUserByEmail(email);
   if (foundUser) {
-    return res.status(400).json({ msg: "The given user already exists" });
+    return res.status(400).json({ msg: "A megadott felhasználó már létezik!" });
   }
 
   const hashed = await bcrypt.hash(password, 10);
   const createdUser = await addUser(username, email, hashed, role);
   if (createdUser) {
-    res.json({ msg: "User created successfully" });
+    res.json({ msg: "Felhasználó létrehozása sikeres" });
   } else {
-    res.json({ msg: "Failed to create user" });
+    res.json({ msg: "Felhasználó létrehozása sikertelen!" });
   }
 });
 
@@ -82,7 +82,7 @@ router.post("/logout", (req, res) => {
   // });
   req.logout((e) => {
     if (e) {
-      return res.status(500).json({ message: "Logout failed" });
+      return res.status(500).json({ message: "Sikertelen kijelentkezés!" });
     }
 
     res.json({ message: "Logged out" });

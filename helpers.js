@@ -21,7 +21,7 @@ export async function findUserByName(username) {
 export async function addUser(username, email, password, role) {
   const user = await queries.createUser(username, email, password, role);
   if (!user) {
-    throw new Error("Failed to create new user!");
+    throw new Error("Új felhasználó létrehozása sikertelen!");
   } else {
     return user;
   }
@@ -39,7 +39,7 @@ export async function addPost(
     const newPostId = newPost.id;
     const mapSuccess = await queries.mapGroupsToPost(newPostId, selectedGroups);
     if (!mapSuccess) {
-      throw new Error("Failed to map groups to new post!");
+      throw new Error("Poszt csoportokhoz rendelése sikertelen!");
     }
   } catch (e) {
     throw new Error(e.message);
@@ -54,5 +54,33 @@ export async function getGroupsOfUser(username) {
     return groupsOfUser;
   } else {
     return undefined;
+  }
+}
+
+export async function getPostsWithComments() {
+  const postsWithComments = await queries.getPostsWithComments();
+  if (postsWithComments) {
+    const postsMap = new Map();
+    postsWithComments.forEach((row) => {
+      if (!postsMap.has(row.postId)) {
+        postsMap.set(row.postId, {
+          id: row.postId,
+          title: row.title,
+          content: row.postContent,
+          comments: [],
+        });
+      }
+      if (row.commentId) {
+        postsMap.get(row.postId).comments.push({
+          id: row.commentId,
+          content: row.commentContent,
+        });
+      }
+    });
+
+    const posts = Array.from(postsMap.values());
+    return posts;
+  } else {
+    throw new Error("Posztok és kommentek lekérdezése sikertelen!");
   }
 }

@@ -83,23 +83,6 @@ app.use((err, req, res, next) => {
   res.status(500).send("Something broke!");
 });
 
-// app.post("/logout", ensureLogin, (req, res) => {
-//   if (req.user) {
-//     req.logOut();
-//     res.json({ message: "Logged out succesfully" });
-//   } else {
-//     res.json({ message: "No user to logout" });
-//   }
-// });
-
-function ensureLogin(req, res, next) {
-  if (!req.isAuthenticated()) {
-    res.status(401).send({ message: "You cannot access this page" });
-    res.redirect("/login");
-  }
-  next();
-}
-
 app.listen(process.env.EXPRESS_PORT, () => {
   console.log(`Server is running on port ${process.env.EXPRESS_PORT}`);
 });

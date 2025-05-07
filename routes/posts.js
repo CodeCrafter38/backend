@@ -1,6 +1,5 @@
 import express from "express";
-import { getPosts } from "../database.js";
-import { findUserByName, addPost } from "../helpers.js";
+import { findUserByName, addPost, getPostsWithComments } from "../helpers.js";
 
 const router = express.Router();
 
@@ -8,7 +7,7 @@ router.get("/", async (req, res) => {
   // console.log("Session in posts:\n", req.session);
   // console.log("Session id in posts:\n", req.session.id);
   if (req.isAuthenticated()) {
-    const posts = await getPosts();
+    const posts = await getPostsWithComments();
     res.json(posts);
   } else {
     return res.status(401).send({ msg: "You are not authenticated" });

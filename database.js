@@ -72,7 +72,7 @@ export async function mapGroupsToPost(postId, groupIds) {
           [postId, groupId]
         );
       });
-      return "Groups succesfully mapped to the given post";
+      return "Poszt csoportokhoz rendelése sikeres";
     } catch (e) {
       throw new Error(e.message);
     } finally {
@@ -177,4 +177,13 @@ export async function getCommentById(id) {
   ]);
   connection.release();
   return rows[0];
+}
+
+export async function getPostsWithComments() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    "SELECT posts.id AS postId, posts.title, posts.content AS postContent, comments.id AS commentId, comments.content AS commentContent FROM posts LEFT JOIN comments ON posts.id = comments.post_id ORDER BY posts.id, comments.id"
+  );
+  connection.release();
+  return rows;
 }
