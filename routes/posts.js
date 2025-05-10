@@ -7,10 +7,11 @@ router.get("/", async (req, res) => {
   // console.log("Session in posts:\n", req.session);
   // console.log("Session id in posts:\n", req.session.id);
   if (req.isAuthenticated()) {
-    const posts = await getPostsWithComments();
+    const { username } = req.query;
+    const posts = await getPostsWithComments(username);
     res.json(posts);
   } else {
-    return res.status(401).send({ msg: "You are not authenticated" });
+    return res.status(401).send({ msg: "Sikertelen azonosítás!" });
   }
 });
 
@@ -21,12 +22,14 @@ router.post("/", async (req, res) => {
     const userId = user.id;
     if (userId) {
       await addPost(title, content, userId, isPublic, selectedGroups);
-      res.json({ msg: "Post created in the given groups" });
+      res.json({ msg: "Poszt létrehozás sikeres!" });
     } else {
-      return res.status(400).json({ msg: "Given user does not exist" });
+      return res
+        .status(400)
+        .json({ msg: "A megadott felhasználó nem létezik!" });
     }
   } else {
-    return res.status(401).json({ msg: "You are not authenticated" });
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
   }
 });
 

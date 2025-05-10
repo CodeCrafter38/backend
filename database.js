@@ -30,14 +30,35 @@ export async function getPost(id) {
   return rows[0];
 }
 
-export async function createPost(title, content, isPublic, userId) {
-  let visibility;
-  if (isPublic) {
-    visibility = "PUBLIC";
-  } else {
-    visibility = "PRIVATE";
-  }
+export async function getAllPostsWithComments() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    "SELECT posts.id, posts.title, posts.content, posts.created_at, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
+  );
+  connection.release();
+  return rows;
+}
 
+export async function getPublicPostsWithComments() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    "SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
+  );
+  connection.release();
+  return rows;
+}
+
+export async function getPostsWithCommentsByUserGroups(userId) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
+    [userId]
+  );
+  connection.release();
+  return rows;
+}
+
+export async function createPost(title, content, visibility, userId) {
   const connection = await pool.getConnection();
   //await connection.beginTransaction();
   let insertedPostId;
@@ -177,13 +198,4 @@ export async function getCommentById(id) {
   ]);
   connection.release();
   return rows[0];
-}
-
-export async function getPostsWithComments() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    "SELECT posts.id AS postId, posts.title, posts.content AS postContent, comments.id AS commentId, comments.content AS commentContent FROM posts LEFT JOIN comments ON posts.id = comments.post_id ORDER BY posts.id, comments.id"
-  );
-  connection.release();
-  return rows;
 }

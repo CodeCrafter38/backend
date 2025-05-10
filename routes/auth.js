@@ -42,22 +42,22 @@ router.post("/change-password", async (req, res) => {
     !user ||
     !(await bcrypt.compare(String(oldPassword), String(user.password)))
   ) {
-    return res.status(403).json({ msg: "Invalid old password" });
+    return res.status(403).json({ msg: "Érvénytelen régi jelszó!" });
   }
 
   user.password = await bcrypt.hash(newPassword, 10);
-  res.json({ msg: "Password updated" });
+  res.json({ msg: "Jelszó módosítás sikeres!" });
 });
 
 router.get("/me", async (req, res) => {
-  console.log("Session in posts:\n", req.session);
-  console.log("Session id in posts:\n", req.session.id);
+  console.log("Session a posts-ban:\n", req.session);
+  console.log("Session id a posts-ban:\n", req.session.id);
   req.sessionStore.get(req.session.id, (err, sessionData) => {
     if (err) {
       console.log(err);
       throw err;
     }
-    console.log("Session data:\n", sessionData);
+    console.log("Session adatok:\n", sessionData);
   });
   req.session.visited = true;
   if (req.isAuthenticated()) {
@@ -67,7 +67,7 @@ router.get("/me", async (req, res) => {
     //res.json({ user: req.session.passport.user });
     // res.status(200).send({ cookie: req.session.cookie });
   } else {
-    res.status(401).send("You are not authenticated");
+    res.status(401).send("Sikertelen azonosítás!");
   }
 });
 
@@ -85,7 +85,7 @@ router.post("/logout", (req, res) => {
       return res.status(500).json({ message: "Sikertelen kijelentkezés!" });
     }
 
-    res.json({ message: "Logged out" });
+    res.json({ message: "Kijelentkezés sikeres" });
   });
 });
 

@@ -35,11 +35,33 @@ export async function addPost(
   selectedGroups
 ) {
   try {
-    const newPost = await queries.createPost(title, content, isPublic, userId);
-    const newPostId = newPost.id;
-    const mapSuccess = await queries.mapGroupsToPost(newPostId, selectedGroups);
-    if (!mapSuccess) {
-      throw new Error("Poszt csoportokhoz rendelése sikertelen!");
+    if (isPublic) {
+      const newPublicPost = await queries.createPost(
+        title,
+        content,
+        "PUBLIC",
+        userId
+      );
+      if (!newPublicPost) {
+        throw new Error("Publikus poszt létrehozása sikertelen!");
+      }
+      return;
+    } else {
+      const newPost = await queries.createPost(
+        title,
+        content,
+        "PRIVATE",
+        userId
+      );
+      const newPostId = newPost.id;
+      const mapSuccess = await queries.mapGroupsToPost(
+        newPostId,
+        selectedGroups
+      );
+      if (!mapSuccess) {
+        throw new Error("Poszt csoportokhoz rendelése sikertelen!");
+      }
+      return;
     }
   } catch (e) {
     throw new Error(e.message);
@@ -57,30 +79,40 @@ export async function getGroupsOfUser(username) {
   }
 }
 
-export async function getPostsWithComments() {
-  const postsWithComments = await queries.getPostsWithComments();
-  if (postsWithComments) {
-    const postsMap = new Map();
-    postsWithComments.forEach((row) => {
-      if (!postsMap.has(row.postId)) {
-        postsMap.set(row.postId, {
-          id: row.postId,
-          title: row.title,
-          content: row.postContent,
-          comments: [],
-        });
-      }
-      if (row.commentId) {
-        postsMap.get(row.postId).comments.push({
-          id: row.commentId,
-          content: row.commentContent,
-        });
-      }
-    });
-
-    const posts = Array.from(postsMap.values());
-    return posts;
+export async function getPostsWithComments(userName) {
+  let allFetchedPosts = [];
+  const foundUser = await findUserByName(userName);
+  const userId = foundUser.id;
+  if (userId) {
+    const publicPosts = await queries.getPublicPostsWithComments();
+    const postsWithComments = await queries.getPostsWithCommentsByUserGroups(
+      userId
+    );
+    if (postsWithComments && publicPosts) {
+      allFetchedPosts = postsWithComments.concat(publicPosts);
+    }
+    if (allFetchedPosts) {
+      handleEmptyComments(allFetchedPosts);
+      return allFetchedPosts;
+    } else if (postsWithComments) {
+      handleEmptyComments(postsWithComments);
+      return postsWithComments;
+    } else if (publicPosts) {
+      handleEmptyComments(publicPosts);
+      return postsWithComments;
+    } else {
+      throw new Error("Posztok és kommentek lekérdezése sikertelen!");
+    }
   } else {
-    throw new Error("Posztok és kommentek lekérdezése sikertelen!");
+    throw new Error("Felhasználó lekérdezése sikertelen!");
   }
+}
+
+function handleEmptyComments(posts) {
+  posts.forEach((post) => {
+    if (post.comments[0].content === null) {
+      post.comments = [];
+    }
+  });
+  return;
 }

@@ -7,11 +7,11 @@ const router = express.Router();
 router.get("/ofUser", async (req, res) => {
   if (req.isAuthenticated()) {
     const { username } = req.query;
-    console.log("username in ofUser endpoint: ", username);
+    console.log("username a user endpoint-on: ", username);
     const groups = await getGroupsOfUser(username);
     res.json(groups);
   } else {
-    return res.status(401).send({ msg: "You are not authenticated" });
+    return res.status(401).send({ msg: "Sikertelen azonosítás!" });
   }
 });
 

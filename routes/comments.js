@@ -20,12 +20,14 @@ router.post("/", async (req, res) => {
     const userId = user.id;
     if (userId) {
       const comment = await createComment(content, postId, userId);
-      res.json({ msg: "Comment added to the given post" }, comment);
+      res.json({ msg: "Komment hozzáadva a meagdott poszthoz!" }, comment);
     } else {
-      return res.status(400).json({ msg: "Given user does not exist" });
+      return res
+        .status(400)
+        .json({ msg: "A megadott felhasználó nem létezik!" });
     }
   } else {
-    return res.status(401).json({ msg: "You are not authenticated" });
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
   }
 });
 
