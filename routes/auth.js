@@ -26,7 +26,7 @@ router.post(
   "/login",
   passport.authenticate("local", {
     failureRedirect: "/login",
-    failureMessage: true,
+    failureMessage: "Felhasználónév vagy jelszó nem egyezik!",
   }),
   async (req, res) => {
     //res.redirect("posts");

@@ -7,13 +7,13 @@ export default function initialize(passport) {
     new Strategy({ usernameField: "email" }, async (email, password, done) => {
       try {
         const foundUser = await findUserByEmail(email);
-        if (!foundUser) throw new Error("User not found");
+        if (!foundUser) throw new Error("Felhasználó nem található!");
         if (
           await bcrypt.compare(String(password), String(foundUser.password))
         ) {
           done(null, foundUser);
         } else {
-          throw new Error("Incorrect username or password");
+          throw new Error("Felhasználónév vagy jelszó nem egyezik!");
         }
       } catch (e) {
         done(e, null);
