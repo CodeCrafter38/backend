@@ -51,7 +51,7 @@ export async function getPublicPostsWithComments() {
 export async function getPostsWithCommentsByUserGroups(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    //duplikált kommentek, ha több csoporthoz is hozzá van adva az adott poszt
+    // duplikált kommentek, ha több csoporthoz is hozzá van adva az adott poszt
     // JSON_ARRAYAGG-al - DISTINCT nem működik vele
     // `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`
     // CAST(CONCAT-el - nem működik annak ellenére, hogy ezt ajánlják workaround-nak
