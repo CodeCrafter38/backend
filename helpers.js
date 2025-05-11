@@ -32,7 +32,9 @@ export async function addPost(
   content,
   userId,
   isPublic,
-  selectedGroupIds
+  selectedGroupIds,
+  fileInfos,
+  videoLink
 ) {
   try {
     if (isPublic) {
@@ -40,7 +42,9 @@ export async function addPost(
         title,
         content,
         "PUBLIC",
-        userId
+        userId,
+        fileInfos,
+        videoLink
       );
       if (!newPublicPost) {
         throw new Error("Publikus poszt létrehozása sikertelen!");
@@ -51,7 +55,9 @@ export async function addPost(
         title,
         content,
         "PRIVATE",
-        userId
+        userId,
+        fileInfos,
+        videoLink
       );
       const newPostId = newPost.id;
       const mapSuccess = await queries.mapGroupsToPost(

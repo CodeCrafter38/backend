@@ -9,7 +9,7 @@ router.get("/", async (req, res) => {
     const comments = await getComments();
     res.json(comments);
   } else {
-    return res.status(401).send({ msg: "You are not authenticated" });
+    return res.status(401).send({ msg: "Sikertelen azonosítás!" });
   }
 });
 

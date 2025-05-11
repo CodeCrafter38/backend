@@ -33,7 +33,7 @@ export async function getPost(id) {
 export async function getAllPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT posts.id, posts.title, posts.content, posts.created_at, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
+    "SELECT posts.id, posts.title, posts.content, posts.created_at, posts.video_link, posts.files, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
   );
   connection.release();
   return rows;
@@ -42,7 +42,7 @@ export async function getAllPostsWithComments() {
 export async function getPublicPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
+    "SELECT p.id, p.title, p.content, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
   );
   connection.release();
   return rows;
@@ -55,21 +55,28 @@ export async function getPostsWithCommentsByUserGroups(userId) {
     // JSON_ARRAYAGG-al - DISTINCT nem működik vele
     // `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`
     // CAST(CONCAT-el - nem működik annak ellenére, hogy ezt ajánlják workaround-nak
-    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, CAST(CONCAT('[', GROUP_CONCAT(JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id)), ']') AS JSON) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
+    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, p.video_link, p.files, CAST(CONCAT('[', GROUP_CONCAT(JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id)), ']') AS JSON) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
     [userId]
   );
   connection.release();
   return rows;
 }
 
-export async function createPost(title, content, visibility, userId) {
+export async function createPost(
+  title,
+  content,
+  visibility,
+  userId,
+  fileInfos,
+  videoLink
+) {
   const connection = await pool.getConnection();
   //await connection.beginTransaction();
   let insertedPostId;
   try {
     const [result] = await connection.query(
-      `INSERT INTO posts (title, content, visibility, user_id) VALUES (?, ?, ?, ?)`,
-      [title, content, visibility, userId]
+      `INSERT INTO posts (title, content, visibility, user_id, video_link, files) VALUES (?, ?, ?, ?, ?, ?)`,
+      [title, content, visibility, userId, videoLink, JSON.stringify(fileInfos)]
     );
     insertedPostId = result.insertId;
     connection.release();

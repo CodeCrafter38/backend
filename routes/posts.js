@@ -1,7 +1,19 @@
 import express from "express";
 import { findUserByName, addPost, getPostsWithComments } from "../helpers.js";
+import multer from "multer";
 
 const router = express.Router();
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads");
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage: storage });
 
 router.get("/", async (req, res) => {
   // console.log("Session in posts:\n", req.session);
@@ -15,13 +27,35 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", upload.array("files"), async (req, res) => {
   if (req.isAuthenticated()) {
-    const { title, content, userName, isPublic, selectedGroupIds } = req.body;
+    const {
+      title,
+      content,
+      userName,
+      isPublic,
+      selectedGroupIds,
+      videoLink,
+      files,
+    } = req.body;
+    const fileInfos = files.map((file) => ({
+      filename: file.filename,
+      //path: file.path,
+      size: file.size,
+      mimetype: file.type,
+    }));
     const user = await findUserByName(userName);
     const userId = user.id;
     if (userId) {
-      await addPost(title, content, userId, isPublic, selectedGroupIds);
+      await addPost(
+        title,
+        content,
+        userId,
+        isPublic,
+        selectedGroupIds,
+        fileInfos,
+        videoLink
+      );
       res.json({ msg: "Poszt létrehozás sikeres!" });
     } else {
       return res
