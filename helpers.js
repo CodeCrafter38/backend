@@ -32,7 +32,7 @@ export async function addPost(
   content,
   userId,
   isPublic,
-  selectedGroups
+  selectedGroupIds
 ) {
   try {
     if (isPublic) {
@@ -56,7 +56,7 @@ export async function addPost(
       const newPostId = newPost.id;
       const mapSuccess = await queries.mapGroupsToPost(
         newPostId,
-        selectedGroups
+        selectedGroupIds
       );
       if (!mapSuccess) {
         throw new Error("Poszt csoportokhoz rendelése sikertelen!");

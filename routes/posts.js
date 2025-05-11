@@ -17,11 +17,11 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   if (req.isAuthenticated()) {
-    const { title, content, userName, isPublic, selectedGroups } = req.body;
+    const { title, content, userName, isPublic, selectedGroupIds } = req.body;
     const user = await findUserByName(userName);
     const userId = user.id;
     if (userId) {
-      await addPost(title, content, userId, isPublic, selectedGroups);
+      await addPost(title, content, userId, isPublic, selectedGroupIds);
       res.json({ msg: "Poszt létrehozás sikeres!" });
     } else {
       return res

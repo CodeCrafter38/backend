@@ -51,7 +51,11 @@ export async function getPublicPostsWithComments() {
 export async function getPostsWithCommentsByUserGroups(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
+    //duplikált kommentek, ha több csoporthoz is hozzá van adva az adott poszt
+    // JSON_ARRAYAGG-al - DISTINCT nem működik vele
+    // `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`
+    // CAST(CONCAT-el - nem működik annak ellenére, hogy ezt ajánlják workaround-nak
+    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, CAST(CONCAT('[', GROUP_CONCAT(JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id)), ']') AS JSON) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
     [userId]
   );
   connection.release();
@@ -162,7 +166,7 @@ export async function createUser(username, email, password, role) {
 export async function getGroupsOfUser(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT group_id FROM user_groups WHERE user_id = ?`,
+    `SELECT user_groups.group_id, groups_nexus.name FROM user_groups JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
     [userId]
   );
   connection.release();
