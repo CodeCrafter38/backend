@@ -87,25 +87,37 @@ export async function getGroupsOfUser(username) {
 
 export async function getPostsWithComments(userName) {
   let allFetchedPosts = [];
+  // lekérdezzük, hogy a frontendről érkező felhasználó létezik-e
   const foundUser = await findUserByName(userName);
   const userId = foundUser.id;
+
   if (userId) {
+    // ha létezik a felhasználó, lekérdezzük, milyen csoportokban van benne
+    const groupsOfUser = await getGroupsOfUser(userName);
+    // kinyerjük a csoportok id-jait
+    const groupIds = Object.values(groupsOfUser).map((group) => group.id);
+
     const publicPosts = await queries.getPublicPostsWithComments();
-    const postsWithComments = await queries.getPostsWithCommentsByUserGroups(
-      userId
-    );
-    if (postsWithComments && publicPosts) {
-      allFetchedPosts = postsWithComments.concat(publicPosts);
+    // a csoportId-k alapján lekérdezzük a posztokat
+    const privatePostsWithComments =
+      await queries.getPostsWithCommentsByUserGroups(groupIds);
+    if (privatePostsWithComments && publicPosts) {
+      // összefűzzük a publikus posztokat a privát posztokkal
+      allFetchedPosts = privatePostsWithComments.concat(publicPosts);
+      // az eredményül kapott listát dátum szerint csökkenő sorrendbe rendezzük (legújabb legfelül)
+      allFetchedPosts.sort(function (a, b) {
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
     }
     if (allFetchedPosts) {
       handleEmptyComments(allFetchedPosts);
       return allFetchedPosts;
-    } else if (postsWithComments) {
-      handleEmptyComments(postsWithComments);
-      return postsWithComments;
+    } else if (privatePostsWithComments) {
+      handleEmptyComments(privatePostsWithComments);
+      return privatePostsWithComments;
     } else if (publicPosts) {
       handleEmptyComments(publicPosts);
-      return postsWithComments;
+      return publicPosts;
     } else {
       throw new Error("Posztok és kommentek lekérdezése sikertelen!");
     }
@@ -114,6 +126,8 @@ export async function getPostsWithComments(userName) {
   }
 }
 
+// az üres kommenteket null értékekkel feltöltve adja vissza az adatbázis query,
+// ezért az ilyen "üres" komment objektumokat kicseréljük üres tömbre, hogy könnyebben tudjuk kezelni frontenden
 function handleEmptyComments(posts) {
   posts.forEach((post) => {
     if (post.comments[0].content === null) {

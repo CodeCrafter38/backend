@@ -22,7 +22,8 @@ export async function getPosts() {
 
 export async function getPost(id) {
   const connection = await pool.getConnection();
-  //prepared statement, send sql query and user-given value separately to avoid sql-injection
+  // prepared statement (előkészített utasítás), afelhasználó által megadott értékeket
+  // az sql query-től külön küldjük be, és előfeldolgozza az adatbázis-engine az sql-injection elleni védelemhez
   const [rows] = await connection.query(`SELECT * FROM posts WHERE id = ?`, [
     id,
   ]);
@@ -48,18 +49,60 @@ export async function getPublicPostsWithComments() {
   return rows;
 }
 
-export async function getPostsWithCommentsByUserGroups(userId) {
+export async function getPostsWithCommentsByUserGroups(groupIds) {
+  const resultPosts = [];
   const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    // duplikált kommentek, ha több csoporthoz is hozzá van adva az adott poszt
-    // JSON_ARRAYAGG-al - DISTINCT nem működik vele
-    // `SELECT p.id, p.title, p.content, p.created_at, p.user_id, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`
-    // CAST(CONCAT-el - nem működik annak ellenére, hogy ezt ajánlják workaround-nak
-    `SELECT p.id, p.title, p.content, p.created_at, p.user_id, p.video_link, p.files, CAST(CONCAT('[', GROUP_CONCAT(JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id)), ']') AS JSON) AS comments FROM posts p JOIN post_groups pg ON p.id = pg.post_id JOIN user_groups ug ON pg.group_id = ug.group_id LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PRIVATE' AND ug.user_id = ? GROUP BY p.id ORDER BY p.created_at DESC`,
-    [userId]
-  );
-  connection.release();
-  return rows;
+  await connection.beginTransaction();
+  // lekérdezzük a felhasználó csoportjai alapján az összes posztot, minden posztot csak egyszer (distinct)
+  try {
+    const [postRows] = await connection.query(
+      `SELECT DISTINCT p.id
+      FROM posts p
+      JOIN post_groups pg ON p.id = pg.post_id
+      WHERE p.visibility = 'PRIVATE' AND pg.group_id IN (?)`,
+      [groupIds]
+    );
+
+    // kiszedjük a posztok id-jait, ami alapján le tudjuk kérdezni hozzájuk a kommenteket
+    const postIds = postRows.map((row) => row.id);
+    if (postIds.length === 0) {
+      return [];
+    }
+
+    // lekérdezzük a posztokat a kommentekkel együtt, és visszaadjuk
+    const [rows] = await connection.query(
+      `SELECT p.id, p.title, p.content, p.created_at, p.video_link, p.files,
+        JSON_ARRAYAGG(
+          CASE
+            WHEN c.id IS NOT NULL THEN JSON_OBJECT(
+              'id', c.id,
+              'content', c.content,
+              'created_at', c.created_at,
+              'user_id', c.user_id
+            )
+            ELSE JSON_OBJECT('content', NULL)
+          END
+        ) AS comments
+      FROM posts p
+      LEFT JOIN comments c ON c.post_id = p.id
+      WHERE p.id IN (?)
+      GROUP BY p.id
+      ORDER BY p.created_at DESC`,
+      [postIds]
+    );
+    await connection.commit();
+    console.log("Posztok csoportonkénti lekérdezésének tranzakciója sikeres.");
+    return rows;
+  } catch (err) {
+    await connection.rollback();
+    console.error(
+      "Posztok csoportonkénti lekérdezésének tranzakciója sikertelen!",
+      err
+    );
+  } finally {
+    connection.release();
+  }
+  return resultPosts;
 }
 
 export async function createPost(
@@ -71,7 +114,6 @@ export async function createPost(
   videoLink
 ) {
   const connection = await pool.getConnection();
-  //await connection.beginTransaction();
   let insertedPostId;
   try {
     const [result] = await connection.query(
@@ -87,7 +129,6 @@ export async function createPost(
       throw e;
     }
   } catch (e) {
-    //await connection.rollback();
     throw e;
   } finally {
     connection.release();
@@ -104,7 +145,7 @@ export async function mapGroupsToPost(postId, groupIds) {
           [postId, groupId]
         );
       });
-      return "Poszt csoportokhoz rendelése sikeres";
+      console.log("Poszt csoportokhoz rendelése sikeres");
     } catch (e) {
       throw new Error(e.message);
     } finally {
@@ -128,7 +169,6 @@ export async function updatePost(id, title, content) {
 
 export async function getUserById(id) {
   const connection = await pool.getConnection();
-  //prepared statement, send sql query and user-given value separately to avoid sql-injection
   const [rows] = await connection.query(`SELECT * FROM users WHERE id = ?`, [
     id,
   ]);
@@ -173,7 +213,7 @@ export async function createUser(username, email, password, role) {
 export async function getGroupsOfUser(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT user_groups.group_id, groups_nexus.name FROM user_groups JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
+    `SELECT groups_nexus.id, groups_nexus.name FROM user_groups JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
     [userId]
   );
   connection.release();
