@@ -145,7 +145,7 @@ export async function mapGroupsToPost(postId, groupIds) {
           [postId, groupId]
         );
       });
-      console.log("Poszt csoportokhoz rendelése sikeres");
+      return "Poszt csoportokhoz rendelése sikeres";
     } catch (e) {
       throw new Error(e.message);
     } finally {
