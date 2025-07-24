@@ -30,8 +30,9 @@ export async function addUser(username, email, password, role) {
 export async function addPost(
   title,
   content,
-  userId,
   isPublic,
+  labels,
+  userId,
   selectedGroupIds,
   fileInfos,
   videoLink
@@ -42,6 +43,7 @@ export async function addPost(
         title,
         content,
         "PUBLIC",
+        labels,
         userId,
         fileInfos,
         videoLink
@@ -55,6 +57,7 @@ export async function addPost(
         title,
         content,
         "PRIVATE",
+        labels,
         userId,
         fileInfos,
         videoLink

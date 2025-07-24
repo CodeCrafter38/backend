@@ -1,12 +1,14 @@
 import express from "express";
 import { findUserByName, addPost, getPostsWithComments } from "../helpers.js";
 import multer from "multer";
+import path from "path";
 
 const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "uploads");
+    const __dirname = path.resolve();
+    cb(null, path.join(__dirname, "uploads"));
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -16,8 +18,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.get("/", async (req, res) => {
-  // console.log("Session in posts:\n", req.session);
-  // console.log("Session id in posts:\n", req.session.id);
+  // console.log("Session a posts-ban:\n", req.session);
+  // console.log("Session id a posts-ban:\n", req.session.id);
   if (req.isAuthenticated()) {
     const { username } = req.query;
     const posts = await getPostsWithComments(username);
@@ -32,28 +34,41 @@ router.post("/", upload.array("files"), async (req, res) => {
     const {
       title,
       content,
+      labels,
       userName,
       isPublic,
       selectedGroupIds,
       videoLink,
-      files,
     } = req.body;
-    const fileInfos = files.map((file) => ({
-      filename: file.filename,
-      //path: file.path,
-      size: file.size,
-      mimetype: file.type,
-    }));
+
+    const uploadedFiles = req.files;
+    const fileInfos = (uploadedFiles || [])
+      .filter((file) => file && file.filename)
+      .map((file) => ({
+        filename: file.filename,
+        path: file.path,
+        size: file.size,
+        mimetype: file.mimetype,
+      }));
+
+    let groupIds = [];
+    if (Array.isArray(selectedGroupIds)) {
+      groupIds = selectedGroupIds.map((id) => parseInt(id));
+    } else if (selectedGroupIds) {
+      groupIds = [parseInt(selectedGroupIds)];
+    }
+
     const user = await findUserByName(userName);
     const userId = user.id;
     if (userId) {
       await addPost(
         title,
         content,
+        isPublic === "true",
+        labels,
         userId,
-        isPublic,
-        selectedGroupIds,
-        fileInfos,
+        groupIds,
+        fileInfos.length ? fileInfos : null,
         videoLink
       );
       res.json({ msg: "Poszt létrehozás sikeres!" });

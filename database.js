@@ -34,7 +34,7 @@ export async function getPost(id) {
 export async function getAllPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT posts.id, posts.title, posts.content, posts.created_at, posts.video_link, posts.files, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
+    "SELECT posts.id, posts.title, posts.content, posts.labels, posts.created_at, posts.video_link, posts.files, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
   );
   connection.release();
   return rows;
@@ -43,7 +43,7 @@ export async function getAllPostsWithComments() {
 export async function getPublicPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
+    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
   );
   connection.release();
   return rows;
@@ -71,7 +71,7 @@ export async function getPostsWithCommentsByUserGroups(groupIds) {
 
     // lekérdezzük a posztokat a kommentekkel együtt, és visszaadjuk
     const [rows] = await connection.query(
-      `SELECT p.id, p.title, p.content, p.created_at, p.video_link, p.files,
+      `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.video_link, p.files,
         JSON_ARRAYAGG(
           CASE
             WHEN c.id IS NOT NULL THEN JSON_OBJECT(
@@ -109,6 +109,7 @@ export async function createPost(
   title,
   content,
   visibility,
+  labels,
   userId,
   fileInfos,
   videoLink
@@ -117,8 +118,17 @@ export async function createPost(
   let insertedPostId;
   try {
     const [result] = await connection.query(
-      `INSERT INTO posts (title, content, visibility, user_id, video_link, files) VALUES (?, ?, ?, ?, ?, ?)`,
-      [title, content, visibility, userId, videoLink, JSON.stringify(fileInfos)]
+      `INSERT INTO posts (title, content, visibility, labels, user_id, video_link, files)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        title,
+        content,
+        visibility,
+        labels,
+        userId,
+        videoLink,
+        JSON.stringify(fileInfos),
+      ]
     );
     insertedPostId = result.insertId;
     connection.release();
@@ -213,7 +223,8 @@ export async function createUser(username, email, password, role) {
 export async function getGroupsOfUser(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT groups_nexus.id, groups_nexus.name FROM user_groups JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
+    `SELECT groups_nexus.id, groups_nexus.name FROM user_groups
+    JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
     [userId]
   );
   connection.release();

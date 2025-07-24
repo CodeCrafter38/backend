@@ -7,6 +7,7 @@ import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import expressMySQLSession from "express-mysql-session";
 import { v4 as uuidv4 } from "uuid";
+import path from "path";
 
 import initializePassport from "./strategies/local-strategy.js";
 import authRoutes from "./routes/auth.js";
@@ -14,10 +15,11 @@ import postRoutes from "./routes/posts.js";
 import userRoutes from "./routes/users.js";
 import groupRoutes from "./routes/groups.js";
 import commentRoutes from "./routes/comments.js";
+import fileRoutes from "./routes/files.js";
 
 dotenv.config();
 
-//generate random id for cookies
+// random id generálás a cookie-hoz
 const cookieSecret = uuidv4();
 
 const options = {
@@ -27,30 +29,31 @@ const options = {
   database: process.env.MYSQL_DATABASE,
 };
 
-// configure session store, it stores the sessions in the configured database when service is started
+// session store beállítása, a beállított adatbázisban tárolja a munkameneteket, amikor a backend service elindul
 const MySQLStore = expressMySQLSession(session);
 const sessionStore = new MySQLStore(options);
 
 const app = express();
+const __dirname = path.resolve();
 
-// Use session middleware
+// session middleware használata
 app.use(
   session({
     secret: cookieSecret,
-    saveUninitialized: false, // do not save unnecessary sessions in session store (e.g. when user just signs in and does nothing)
-    resave: false, // disable to force the session saved back to the session store, even if the session was never modified during the request
+    saveUninitialized: false, // ne mentsük el a szükségtelen munkameneteket a session store-ba (pl. amikor a felhasználó csak bejelentkezik és nem csinál semmit)
+    resave: false, // Ne engedjük a session újra elmentését a session store-ba, még akkor sem, ha a session nem módosult a kérés során
     cookie: {
-      maxAge: 60000 * 60, // 1 hour (in milliseconds)
+      maxAge: 60000 * 60, // 1 óra (miliszekumndumban)
     },
-    store: sessionStore, // use configured session store to store cookies even if backend is down
+    store: sessionStore, // a bekonfigolt session store-t használjuk a cookie-k tárolására, még akkor is, ha a backend leáll (nem működik még)
   })
 );
 
 sessionStore
   .onReady()
   .then(() => {
-    // MySQL session store is ready for use
-    console.log("MySQL session store is ready");
+    // MySQL session store készen áll
+    console.log("A MySQL session store készen áll");
   })
   .catch((e) => {
     console.error(e);
@@ -61,6 +64,7 @@ app.use(bodyParser.json());
 app.use(cookieParser(cookieSecret));
 
 initializePassport(passport);
+
 app.use(
   cors({
     origin: `http://localhost:${process.env.FRONTEND_PORT}`,
@@ -68,21 +72,23 @@ app.use(
   })
 );
 
-// Initialize Passport
+// Passport inicializálása
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Route-ok inicializálása
 app.use("/api", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/comments", commentRoutes);
+app.use("/api/files", fileRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).send("Something broke!");
+  res.status(500).send("Ismeretlen hiba történt a backenden!");
 });
 
 app.listen(process.env.EXPRESS_PORT, () => {
-  console.log(`Server is running on port ${process.env.EXPRESS_PORT}`);
+  console.log(`A szerve fut a következő porton: ${process.env.EXPRESS_PORT}`);
 });
