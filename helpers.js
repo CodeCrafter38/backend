@@ -89,16 +89,30 @@ export async function getGroupsOfUser(username) {
 }
 
 export async function getPostsWithComments(userName) {
-  let allFetchedPosts = [];
   // lekérdezzük, hogy a frontendről érkező felhasználó létezik-e
   const foundUser = await findUserByName(userName);
   const userId = foundUser.id;
+  const userRole = foundUser.role;
 
   if (userId) {
+    let resultPosts = undefined;
     // ha létezik a felhasználó, lekérdezzük, milyen csoportokban van benne
     const groupsOfUser = await getGroupsOfUser(userName);
     // kinyerjük a csoportok id-jait
     const groupIds = Object.values(groupsOfUser).map((group) => group.id);
+
+    const groupIdsWithPostIds = await queries.getPostsOfGroups(groupIds);
+
+    if ((userRole === "TEACHER") | (userRole === "ADMIN")) {
+      // ha tanár vagy admin, akkor lekérdezzük az összes csoportot
+      resultPosts = await queries.getAllPostsWithComments();
+      if (resultPosts) {
+        handleEmptyComments(resultPosts);
+        return { resultPosts, groupsOfUser, groupIdsWithPostIds };
+      } else {
+        throw new Error("Posztok és kommentek lekérdezése sikertelen!");
+      }
+    }
 
     const publicPosts = await queries.getPublicPostsWithComments();
     // a csoportId-k alapján lekérdezzük a posztokat
@@ -106,21 +120,21 @@ export async function getPostsWithComments(userName) {
       await queries.getPostsWithCommentsByUserGroups(groupIds);
     if (privatePostsWithComments && publicPosts) {
       // összefűzzük a publikus posztokat a privát posztokkal
-      allFetchedPosts = privatePostsWithComments.concat(publicPosts);
+      resultPosts = privatePostsWithComments.concat(publicPosts);
       // az eredményül kapott listát dátum szerint csökkenő sorrendbe rendezzük (legújabb legfelül)
-      allFetchedPosts.sort(function (a, b) {
+      resultPosts.sort(function (a, b) {
         return new Date(b.created_at) - new Date(a.created_at);
       });
     }
-    if (allFetchedPosts) {
-      handleEmptyComments(allFetchedPosts);
-      return allFetchedPosts;
+    if (resultPosts) {
+      handleEmptyComments(resultPosts);
+      return { resultPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (privatePostsWithComments) {
-      handleEmptyComments(privatePostsWithComments);
-      return privatePostsWithComments;
+      resultPosts = handleEmptyComments(privatePostsWithComments);
+      return { resultPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (publicPosts) {
-      handleEmptyComments(publicPosts);
-      return publicPosts;
+      resultPosts = handleEmptyComments(publicPosts);
+      return { publicPosts, groupsOfUser, groupIdsWithPostIds };
     } else {
       throw new Error("Posztok és kommentek lekérdezése sikertelen!");
     }

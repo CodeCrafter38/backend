@@ -90,5 +90,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(process.env.EXPRESS_PORT, () => {
-  console.log(`A szerve fut a következő porton: ${process.env.EXPRESS_PORT}`);
+  console.log(`A szerver fut a következő porton: ${process.env.EXPRESS_PORT}`);
 });

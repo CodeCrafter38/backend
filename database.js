@@ -34,7 +34,7 @@ export async function getPost(id) {
 export async function getAllPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT posts.id, posts.title, posts.content, posts.labels, posts.created_at, posts.video_link, posts.files, comments.id, comments.content, comments.created_at FROM posts LEFT JOIN comments ON posts.id = comments.post_id GROUP BY p.id"
+    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id GROUP BY p.id ORDER BY p.created_at DESC"
   );
   connection.release();
   return rows;
@@ -177,6 +177,26 @@ export async function updatePost(id, title, content) {
   return await getPost(resultId);
 }
 
+export async function deletePost(id) {
+  const connection = await pool.getConnection();
+  try {
+    const [results] = await connection.query(`DELETE FROM posts WHERE id = ?`, [
+      id,
+    ]);
+    if (results.affectedRows === 1) {
+      return true;
+    } else {
+      console.warn("A törlendő poszt nem található");
+      return true;
+    }
+  } catch (error) {
+    console.error("SQL hiba: ", error);
+    return false;
+  } finally {
+    connection.release();
+  }
+}
+
 export async function getUserById(id) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(`SELECT * FROM users WHERE id = ?`, [
@@ -220,6 +240,15 @@ export async function createUser(username, email, password, role) {
   }
 }
 
+export async function getAllGroups() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    "SELECT groups_nexus.id, groups_nexus.name FROM groups_nexus"
+  );
+  connection.release();
+  return rows;
+}
+
 export async function getGroupsOfUser(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
@@ -229,6 +258,85 @@ export async function getGroupsOfUser(userId) {
   );
   connection.release();
   return rows;
+}
+
+export async function getPostsOfGroups(groupIds) {
+  if (groupIds) {
+    const connection = await pool.getConnection();
+    try {
+      let groupIdsWithPostIds = [];
+      groupIds.forEach(async (groupId) => {
+        const [postRows] = await connection.query(
+          `SELECT post_id
+          FROM post_groups
+          WHERE group_id = ?`,
+          [groupId]
+        );
+        groupIdsWithPostIds.push({
+          groupId,
+          postIds: postRows.map((row) => row.post_id),
+        });
+      });
+      return groupIdsWithPostIds;
+    } catch (e) {
+      throw new Error(e.message);
+    } finally {
+      connection.release();
+    }
+  } else {
+    return undefined;
+  }
+}
+
+export async function addUserToGroup(userId, groupId) {
+  const connection = await pool.getConnection();
+  try {
+    const [result] = await connection.query(
+      `INSERT INTO user_groups VALUES (?, ?)`,
+      [userId, groupId]
+    );
+    connection.release();
+    const id = result.insertId;
+    return await getCommentById(id);
+  } catch (e) {
+    throw new Error(e.message);
+  }
+}
+
+export async function deleteUserFromGroup(userId, groupId) {
+  const connection = await pool.getConnection();
+  const success = false;
+  const [rows] = await connection.query(
+    `DELETE FROM user_groups WHERE user_id = ? AND group_id = ?`,
+    userId,
+    groupId
+  );
+  if (error) {
+    console.error("SQL hiba: ", error);
+  } else if (results.affectedRows === 1) {
+    success = true;
+  } else {
+    console.warn("A törlendő felhasználó vagy a csoport nem található");
+    success = true;
+  }
+  connection.release();
+  return success;
+}
+
+export async function getComments() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query("SELECT * FROM comments");
+  connection.release();
+  return rows;
+}
+
+export async function getCommentById(id) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(`SELECT * FROM comments WHERE id = ?`, [
+    id,
+  ]);
+  connection.release();
+  return rows[0];
 }
 
 export async function createComment(content, postId, userId) {
@@ -246,18 +354,23 @@ export async function createComment(content, postId, userId) {
   }
 }
 
-export async function getComments() {
+export async function deleteComment(id) {
   const connection = await pool.getConnection();
-  const [rows] = await connection.query("SELECT * FROM comments");
-  connection.release();
-  return rows;
-}
-
-export async function getCommentById(id) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(`SELECT * FROM comments WHERE id = ?`, [
-    id,
-  ]);
-  connection.release();
-  return rows[0];
+  try {
+    const [results] = await connection.query(
+      `DELETE FROM comments WHERE id = ?`,
+      [id]
+    );
+    if (results.affectedRows === 1) {
+      return true;
+    } else {
+      console.warn("A törlendő komment nem található");
+      return true;
+    }
+  } catch (error) {
+    console.error("SQL hiba: ", error);
+    return false;
+  } finally {
+    connection.release();
+  }
 }

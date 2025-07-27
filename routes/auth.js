@@ -63,7 +63,8 @@ router.get("/me", async (req, res) => {
   if (req.isAuthenticated()) {
     const foundUser = await findUserByEmail(req.session.passport.user);
     const username = foundUser.username;
-    res.json({ user: username });
+    const role = foundUser.role;
+    res.json({ user: { username, role } });
     //res.json({ user: req.session.passport.user });
     // res.status(200).send({ cookie: req.session.cookie });
   } else {

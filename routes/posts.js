@@ -2,6 +2,7 @@ import express from "express";
 import { findUserByName, addPost, getPostsWithComments } from "../helpers.js";
 import multer from "multer";
 import path from "path";
+import * as queries from "../database.js";
 
 const router = express.Router();
 
@@ -79,6 +80,20 @@ router.post("/", upload.array("files"), async (req, res) => {
     }
   } else {
     return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+  }
+});
+
+router.delete("/", async (req, res) => {
+  if (req.isAuthenticated()) {
+    const { id } = req.query;
+    const posts = await queries.deletePost(id);
+    if (posts) {
+      res.status(204).send();
+    } else {
+      res.status(500).send("Adatbázis hiba történt!");
+    }
+  } else {
+    return res.status(401).send({ msg: "Sikertelen azonosítás!" });
   }
 });
 
