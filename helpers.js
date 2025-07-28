@@ -18,6 +18,15 @@ export async function findUserByName(username) {
   }
 }
 
+export async function findUserById(id) {
+  const user = await queries.getUserById(id);
+  if (!user) {
+    return undefined;
+  } else {
+    return user.username;
+  }
+}
+
 export async function addUser(username, email, password, role) {
   const user = await queries.createUser(username, email, password, role);
   if (!user) {
@@ -108,7 +117,8 @@ export async function getPostsWithComments(userName) {
       resultPosts = await queries.getAllPostsWithComments();
       if (resultPosts) {
         handleEmptyComments(resultPosts);
-        return { resultPosts, groupsOfUser, groupIdsWithPostIds };
+        const readyPosts = await getUserNameForPostAndComments(resultPosts);
+        return { readyPosts, groupsOfUser, groupIdsWithPostIds };
       } else {
         throw new Error("Posztok és kommentek lekérdezése sikertelen!");
       }
@@ -128,13 +138,16 @@ export async function getPostsWithComments(userName) {
     }
     if (resultPosts) {
       handleEmptyComments(resultPosts);
-      return { resultPosts, groupsOfUser, groupIdsWithPostIds };
+      const readyPosts = await getUserNameForPostAndComments(resultPosts);
+      return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (privatePostsWithComments) {
       resultPosts = handleEmptyComments(privatePostsWithComments);
-      return { resultPosts, groupsOfUser, groupIdsWithPostIds };
+      const readyPosts = await getUserNameForPostAndComments(resultPosts);
+      return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (publicPosts) {
       resultPosts = handleEmptyComments(publicPosts);
-      return { publicPosts, groupsOfUser, groupIdsWithPostIds };
+      const readyPosts = await getUserNameForPostAndComments(resultPosts);
+      return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else {
       throw new Error("Posztok és kommentek lekérdezése sikertelen!");
     }
@@ -152,4 +165,33 @@ function handleEmptyComments(posts) {
     }
   });
   return;
+}
+
+async function getUserNameForPostAndComments(posts) {
+  const updatedPosts = await Promise.all(
+    posts.map(async (post) => {
+      const username = await getUserNameById(post.user_id);
+
+      const updatedComments = await Promise.all(
+        (post.comments || []).map(async (comment) => {
+          const commentUsername = await getUserNameById(comment.user_id);
+          return { ...comment, username: commentUsername };
+        })
+      );
+
+      return { ...post, username, comments: updatedComments };
+    })
+  );
+
+  return updatedPosts;
+}
+
+async function getUserNameById(userId) {
+  return await findUserById(userId).then((user) => {
+    if (user) {
+      return user;
+    } else {
+      throw new Error("A poszt felhasználója nem található!");
+    }
+  });
 }

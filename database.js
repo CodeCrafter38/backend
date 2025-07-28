@@ -199,9 +199,10 @@ export async function deletePost(id) {
 
 export async function getUserById(id) {
   const connection = await pool.getConnection();
-  const [rows] = await connection.query(`SELECT * FROM users WHERE id = ?`, [
-    id,
-  ]);
+  const [rows] = await connection.query(
+    `SELECT username FROM users WHERE id = ?`,
+    [id]
+  );
   connection.release();
   return rows[0];
 }
