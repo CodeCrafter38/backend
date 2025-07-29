@@ -71,7 +71,7 @@ export async function getPostsWithCommentsByUserGroups(groupIds) {
 
     // lekérdezzük a posztokat a kommentekkel együtt, és visszaadjuk
     const [rows] = await connection.query(
-      `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.video_link, p.files,
+      `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files,
         JSON_ARRAYAGG(
           CASE
             WHEN c.id IS NOT NULL THEN JSON_OBJECT(
@@ -136,10 +136,10 @@ export async function createPost(
       const newPost = await getPost(insertedPostId);
       return newPost;
     } catch (e) {
-      throw e;
+      throw new Error(e.message);
     }
   } catch (e) {
-    throw e;
+    throw new Error(e.message);
   } finally {
     connection.release();
   }
@@ -241,10 +241,28 @@ export async function createUser(username, email, password, role) {
   }
 }
 
+export async function updateUsername(userId, newUsername) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `UPDATE users SET username = ? WHERE id = ?`,
+    [newUsername, userId]
+  );
+  return [rows];
+}
+
+export async function updatePassword(userId, newPassword) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `UPDATE users SET password = ? WHERE id = ?`,
+    [newPassword, userId]
+  );
+  return [rows];
+}
+
 export async function getAllGroups() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT groups_nexus.id, groups_nexus.name FROM groups_nexus"
+    "SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description FROM groups_nexus"
   );
   connection.release();
   return rows;
@@ -259,6 +277,75 @@ export async function getGroupsOfUser(userId) {
   );
   connection.release();
   return rows;
+}
+
+export async function getUsersOfGroup(groupId) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `SELECT users.id, users.username FROM user_groups
+    JOIN users ON user_groups.user_id=users.id WHERE group_id = ?`,
+    [groupId]
+  );
+  connection.release();
+  return rows;
+}
+
+export async function getGroup(id) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `SELECT * FROM groups_nexus WHERE id = ?`,
+    [id]
+  );
+  connection.release();
+  return rows[0];
+}
+
+export async function getGroupByName(groupName) {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    `SELECT * FROM groups_nexus WHERE name = ?`,
+    [groupName]
+  );
+  connection.release();
+  return rows[0];
+}
+
+export async function createGroup(name, description, userId) {
+  const connection = await pool.getConnection();
+  try {
+    const [result] = await connection.query(
+      `INSERT INTO groups_nexus (name, description, created_by) VALUES (?, ?, ?)`,
+      [name, description, userId]
+    );
+    const insertedGroupId = result.insertId;
+    connection.release();
+    try {
+      const newGroup = await getGroup(insertedGroupId);
+      return newGroup;
+    } catch (e) {
+      throw new Error(e.message);
+    }
+  } catch (e) {
+    throw new Error(e.message);
+  } finally {
+    connection.release();
+  }
+}
+
+export async function mapUserToGroup(userId, groupId) {
+  const connection = await pool.getConnection();
+  try {
+    const [result] = await connection.query(
+      `INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)`,
+      [userId, groupId]
+    );
+    const id = result.insertId;
+    return "Felhasználó csoporthoz rendelése sikeres";
+  } catch (e) {
+    throw new Error(e.message);
+  } finally {
+    connection.release();
+  }
 }
 
 export async function getPostsOfGroups(groupIds) {

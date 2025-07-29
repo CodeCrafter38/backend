@@ -1,7 +1,13 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import passport from "passport";
-import { findUserByEmail, addUser } from "../helpers.js";
+import {
+  findUserByEmail,
+  findUserByName,
+  addUser,
+  changeUsername,
+  changePassword,
+} from "../helpers.js";
 
 const router = express.Router();
 
@@ -33,21 +39,6 @@ router.post(
     res.sendStatus(200);
   }
 );
-
-router.post("/change-password", async (req, res) => {
-  const { oldPassword, newPassword } = req.body;
-  const user = findUserByEmail(req.user?.email);
-
-  if (
-    !user ||
-    !(await bcrypt.compare(String(oldPassword), String(user.password)))
-  ) {
-    return res.status(403).json({ msg: "Érvénytelen régi jelszó!" });
-  }
-
-  user.password = await bcrypt.hash(newPassword, 10);
-  res.json({ msg: "Jelszó módosítás sikeres!" });
-});
 
 router.get("/me", async (req, res) => {
   console.log("Session a posts-ban:\n", req.session);
@@ -88,6 +79,89 @@ router.post("/logout", (req, res) => {
 
     res.json({ message: "Kijelentkezés sikeres" });
   });
+});
+
+router.post("/change-username", async (req, res) => {
+  const { oldUsername, newUsername } = req.body;
+
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+  }
+
+  try {
+    // megkeressük a bejelentkezett felhasználót
+    const user = await findUserByEmail(req.session.passport.user);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ msg: "A megadott felhasználó nem található!" });
+    }
+
+    if (user.username !== oldUsername) {
+      return res
+        .status(400)
+        .json({ msg: "A régi felhasználónév nem egyezik!" });
+    }
+
+    if (
+      oldUsername === newUsername ||
+      oldUsername.trim() === newUsername.trim()
+    ) {
+      return res
+        .status(400)
+        .json({ msg: "Az új felhasználónév nem egyezhet meg a régivel!" });
+    }
+
+    const existingUser = await findUserByName(newUsername.trim());
+    if (existingUser) {
+      return res
+        .status(409)
+        .json({ msg: "A megadott felhasználónév foglalt!" });
+    }
+
+    if (!newUsername || !newUsername.trim()) {
+      return res
+        .status(400)
+        .json({ msg: "Az új felhasználónév nem lehet üres!" });
+    }
+
+    const updated = await changeUsername(user.id, newUsername);
+    return res
+      .status(200)
+      .json({ msg: "Felhasználónév módosítva!", user: updated });
+  } catch (e) {
+    return res.status(500).json({
+      msg:
+        "Szerver hiba történt a felhasználónév módosítás során: " + e.message,
+    });
+  }
+});
+
+router.post("/change-password", async (req, res) => {
+  const { username, oldPassword, newPassword } = req.body;
+  try {
+    const user = await findUserByName(username);
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+    }
+
+    if (
+      !user ||
+      !(await bcrypt.compare(String(oldPassword), String(user.password)))
+    ) {
+      return res.status(403).json({ msg: "Érvénytelen régi jelszó!" });
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    const updated = await changePassword(user.id, hashed);
+
+    return res.status(200).json({ msg: "Jelszó módosítva!", user: updated });
+  } catch (e) {
+    return res.status(500).json({
+      msg: "Szerver hiba történt a jelszó módosítás során: " + e.message,
+    });
+  }
 });
 
 export default router;

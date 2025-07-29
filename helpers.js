@@ -86,6 +86,15 @@ export async function addPost(
   }
 }
 
+export async function getAllGroups() {
+  const allGroups = await queries.getAllGroups();
+  if (allGroups) {
+    return allGroups;
+  } else {
+    return undefined;
+  }
+}
+
 export async function getGroupsOfUser(username) {
   const foundUser = await findUserByName(username);
   if (foundUser) {
@@ -95,6 +104,31 @@ export async function getGroupsOfUser(username) {
   } else {
     return undefined;
   }
+}
+
+export async function getUsersOfGroup(groupId) {
+  if (groupId) {
+    const usersOfGroup = await queries.getUsersOfGroup(groupId);
+    return usersOfGroup;
+  } else {
+    return undefined;
+  }
+}
+
+export async function addGroup(name, description, userId) {
+  // Ellenőrizzük, hogy létezik-e már ilyen nevű csoport
+  const existingGroup = await queries.getGroupByName(name);
+  if (existingGroup) {
+    throw new Error("A megadott csoportnév már foglalt!");
+  }
+  const group = await queries.createGroup(name, description, userId);
+  if (group) {
+    await queries.mapUserToGroup(userId, group.id);
+  } else {
+    throw new Error("Csoport létrehozása sikertelen!");
+  }
+
+  return group;
 }
 
 export async function getPostsWithComments(userName) {
@@ -141,12 +175,14 @@ export async function getPostsWithComments(userName) {
       const readyPosts = await getUserNameForPostAndComments(resultPosts);
       return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (privatePostsWithComments) {
-      resultPosts = handleEmptyComments(privatePostsWithComments);
-      const readyPosts = await getUserNameForPostAndComments(resultPosts);
+      handleEmptyComments(privatePostsWithComments);
+      const readyPosts = await getUserNameForPostAndComments(
+        privatePostsWithComments
+      );
       return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else if (publicPosts) {
-      resultPosts = handleEmptyComments(publicPosts);
-      const readyPosts = await getUserNameForPostAndComments(resultPosts);
+      handleEmptyComments(publicPosts);
+      const readyPosts = await getUserNameForPostAndComments(publicPosts);
       return { readyPosts, groupsOfUser, groupIdsWithPostIds };
     } else {
       throw new Error("Posztok és kommentek lekérdezése sikertelen!");
@@ -194,4 +230,20 @@ async function getUserNameById(userId) {
       throw new Error("A poszt felhasználója nem található!");
     }
   });
+}
+
+export async function changeUsername(userId, newUsername) {
+  const updatedUser = await queries.updateUsername(userId, newUsername);
+  if (!updatedUser) {
+    throw new Error("A felhasználónév módosítása sikertelen!");
+  }
+  return updatedUser;
+}
+
+export async function changePassword(userId, newPassword) {
+  const updatedUser = await queries.updatePassword(userId, newPassword);
+  if (!updatedUser) {
+    throw new Error("A jelszó módosítása sikertelen!");
+  }
+  return updatedUser;
 }
