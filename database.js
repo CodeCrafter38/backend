@@ -348,6 +348,23 @@ export async function mapUserToGroup(userId, groupId) {
   }
 }
 
+export async function mapUsersToGroup(groupId, userIds) {
+  const connection = await pool.getConnection();
+  try {
+    userIds.forEach(async (userId) => {
+      await connection.query(
+        `INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)`,
+        [userId, groupId]
+      );
+    });
+    return "Felhasználók csoporthoz rendelése sikeres";
+  } catch (e) {
+    throw new Error(e.message);
+  } finally {
+    connection.release();
+  }
+}
+
 export async function getPostsOfGroups(groupIds) {
   if (groupIds) {
     const connection = await pool.getConnection();
@@ -393,22 +410,23 @@ export async function addUserToGroup(userId, groupId) {
 
 export async function deleteUserFromGroup(userId, groupId) {
   const connection = await pool.getConnection();
-  const success = false;
-  const [rows] = await connection.query(
-    `DELETE FROM user_groups WHERE user_id = ? AND group_id = ?`,
-    userId,
-    groupId
-  );
-  if (error) {
+  try {
+    const [results] = await connection.query(
+      `DELETE FROM user_groups WHERE user_id = ? AND group_id = ?`,
+      [userId, groupId]
+    );
+    if (results.affectedRows === 1) {
+      return true;
+    } else {
+      console.warn("A törlendő felhasználó vagy a csoport nem található");
+      return true;
+    }
+  } catch (error) {
     console.error("SQL hiba: ", error);
-  } else if (results.affectedRows === 1) {
-    success = true;
-  } else {
-    console.warn("A törlendő felhasználó vagy a csoport nem található");
-    success = true;
+    return false;
+  } finally {
+    connection.release();
   }
-  connection.release();
-  return success;
 }
 
 export async function getComments() {

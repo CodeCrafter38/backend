@@ -115,6 +115,34 @@ export async function getUsersOfGroup(groupId) {
   }
 }
 
+export async function addUsersToGroup(groupName, usersToAdd) {
+  const group = await queries.getGroupByName(groupName);
+  if (!group) {
+    throw new Error("A megadott csoport nem található!");
+  }
+  const userIds = [];
+  for (const username of usersToAdd) {
+    const user = await queries.getUserByName(username);
+    if (!user) {
+      throw new Error(
+        `Legalább az egyik megadott felhasználó nem található: ${username}`
+      );
+    }
+    userIds.push(user.id);
+  }
+  await queries.mapUsersToGroup(group.id, userIds);
+  return;
+}
+
+export async function removeUsersFromGroup(groupId) {
+  if (groupId) {
+    const usersOfGroup = await queries.getUsersOfGroup(groupId);
+    return usersOfGroup;
+  } else {
+    return undefined;
+  }
+}
+
 export async function addGroup(name, description, userId) {
   // Ellenőrizzük, hogy létezik-e már ilyen nevű csoport
   const existingGroup = await queries.getGroupByName(name);

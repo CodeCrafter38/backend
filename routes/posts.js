@@ -19,8 +19,6 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 router.get("/", async (req, res) => {
-  // console.log("Session a posts-ban:\n", req.session);
-  // console.log("Session id a posts-ban:\n", req.session.id);
   if (req.isAuthenticated()) {
     const { username } = req.query;
     const posts = await getPostsWithComments(username);
@@ -90,7 +88,7 @@ router.delete("/", async (req, res) => {
     if (posts) {
       res.status(204).send();
     } else {
-      res.status(500).send("Adatbázis hiba történt!");
+      res.status(500).send("Adatbázis hiba történt a poszt törlésekor!");
     }
   } else {
     return res.status(401).send({ msg: "Sikertelen azonosítás!" });
