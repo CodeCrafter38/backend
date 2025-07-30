@@ -151,6 +151,12 @@ export async function addGroup(name, description, userId) {
   }
   const group = await queries.createGroup(name, description, userId);
   if (group) {
+    const adminUser = await queries.getAdminUser();
+    if (adminUser) {
+      await queries.mapUserToGroup(adminUser.id, group.id);
+    } else {
+      throw new Error("Admin felhasználó nem található!");
+    }
     await queries.mapUserToGroup(userId, group.id);
   } else {
     throw new Error("Csoport létrehozása sikertelen!");

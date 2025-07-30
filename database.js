@@ -226,6 +226,15 @@ export async function getUserByEmail(email) {
   return rows[0];
 }
 
+export async function getAdminUser() {
+  const connection = await pool.getConnection();
+  const [rows] = await connection.query(
+    "SELECT * FROM users WHERE role = ADMIN"
+  );
+  connection.release();
+  return rows[0];
+}
+
 export async function createUser(username, email, password, role) {
   const connection = await pool.getConnection();
   try {
@@ -282,7 +291,7 @@ export async function getGroupsOfUser(userId) {
 export async function getUsersOfGroup(groupId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT users.id, users.username FROM user_groups
+    `SELECT users.id, users.username, users.role FROM user_groups
     JOIN users ON user_groups.user_id=users.id WHERE group_id = ?`,
     [groupId]
   );
