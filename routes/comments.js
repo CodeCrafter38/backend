@@ -16,9 +16,13 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   if (req.isAuthenticated()) {
-    const { postId, userName, content } = req.body;
-    const user = await findUserByName(userName);
+    // megkeressük a bejelentkezett felhasználót
+    const user = await findUserByEmail(req.session.passport.user);
+    if (!user) {
+      return res.status(404).json({ msg: "A felhasználó nem található!" });
+    }
     const userId = user.id;
+    const { postId, content } = req.body;
     if (userId) {
       const comment = await createComment(content, postId, userId);
       res.json({ msg: "Komment hozzáadva a meagdott poszthoz!" }, comment);

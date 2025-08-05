@@ -6,7 +6,6 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import expressMySQLSession from "express-mysql-session";
-import { v4 as uuidv4 } from "uuid";
 import path from "path";
 
 import initializePassport from "./strategies/local-strategy.js";
@@ -19,8 +18,8 @@ import fileRoutes from "./routes/files.js";
 
 dotenv.config();
 
-// random id generálás a cookie-hoz
-const cookieSecret = uuidv4();
+// az env fájlban tárolt SESSION_SECRET változó értéke, a munkamenetek titkosításához
+const cookieSecret = process.env.SESSION_SECRET;
 
 const options = {
   host: process.env.MYSQL_HOST,

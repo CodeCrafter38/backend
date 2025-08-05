@@ -14,8 +14,9 @@ const router = express.Router();
 router.post("/signup", async (req, res) => {
   const { username, email, password, role } = req.body;
 
-  const foundUser = await findUserByEmail(email);
-  if (foundUser) {
+  const foundUserByEmail = await findUserByEmail(email);
+  const foundUserByName = await findUserByName(username);
+  if (foundUserByEmail || foundUserByName) {
     return res.status(400).json({ msg: "A megadott felhasználó már létezik!" });
   }
 
@@ -35,7 +36,6 @@ router.post(
     failureMessage: "Felhasználónév vagy jelszó nem egyezik!",
   }),
   async (req, res) => {
-    //res.redirect("posts");
     res.sendStatus(200);
   }
 );
@@ -63,15 +63,7 @@ router.get("/me", async (req, res) => {
   }
 });
 
-// router.get("/status", (req, res) => {
-//   console.log("req.user in status endpoint: ", req.user);
-//   return req.user ? res.send(req.user) : res.sendStatus(401);
-// });
-
 router.post("/logout", (req, res) => {
-  // req.logout(() => {
-  //   res.json({ msg: "You are logged out" });
-  // });
   req.logout((e) => {
     if (e) {
       return res.status(500).json({ message: "Sikertelen kijelentkezés!" });
@@ -82,20 +74,18 @@ router.post("/logout", (req, res) => {
 });
 
 router.post("/change-username", async (req, res) => {
-  const { oldUsername, newUsername } = req.body;
-
   if (!req.isAuthenticated()) {
     return res.status(401).json({ msg: "Sikertelen azonosítás!" });
   }
+
+  const { oldUsername, newUsername } = req.body;
 
   try {
     // megkeressük a bejelentkezett felhasználót
     const user = await findUserByEmail(req.session.passport.user);
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ msg: "A megadott felhasználó nem található!" });
+      return res.status(404).json({ msg: "A felhasználó nem található!" });
     }
 
     if (user.username !== oldUsername) {
@@ -139,17 +129,19 @@ router.post("/change-username", async (req, res) => {
 });
 
 router.post("/change-password", async (req, res) => {
-  const { username, oldPassword, newPassword } = req.body;
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+  }
+
+  const { oldPassword, newPassword } = req.body;
   try {
-    const user = await findUserByName(username);
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+    // megkeressük a bejelentkezett felhasználót
+    const user = await findUserByName(req.session.passport.user);
+    if (!user) {
+      return res.status(404).json({ msg: "A felhasználó nem található!" });
     }
 
-    if (
-      !user ||
-      !(await bcrypt.compare(String(oldPassword), String(user.password)))
-    ) {
+    if (!(await bcrypt.compare(String(oldPassword), String(user.password)))) {
       return res.status(403).json({ msg: "Érvénytelen régi jelszó!" });
     }
 
