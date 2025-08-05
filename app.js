@@ -19,6 +19,8 @@ import fileRoutes from "./routes/files.js";
 dotenv.config();
 
 // az env fájlban tárolt SESSION_SECRET változó értéke, a munkamenetek titkosításához
+// teendő: a .env fájlban a SESSION_SECRET változó beállítása:
+// pl: SESSION_SECRET=187xzndwr8hnwe8 (random karakterekből álló string)
 const cookieSecret = process.env.SESSION_SECRET;
 
 const options = {
