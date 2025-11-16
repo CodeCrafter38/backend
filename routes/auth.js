@@ -11,6 +11,24 @@ import {
 
 const router = express.Router();
 
+router.get(
+  "/auth/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+  })
+);
+
+router.get(
+  "/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: "/login",
+    failureMessage: "Google bejelentkezés sikertelen!",
+  }),
+  async (req, res) => {
+    res.redirect("http://localhost:3000/home");
+  }
+);
+
 router.post("/signup", async (req, res) => {
   const { username, email, password, role } = req.body;
 

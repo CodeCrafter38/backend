@@ -194,8 +194,12 @@ export async function getPostsWithComments(userName) {
 
     const publicPosts = await queries.getPublicPostsWithComments();
     // a csoportId-k alapján lekérdezzük a posztokat
-    const privatePostsWithComments =
-      await queries.getPostsWithCommentsByUserGroups(groupIds);
+    let privatePostsWithComments = [];
+    if (groupsOfUser.length > 0) {
+      privatePostsWithComments = await queries.getPostsWithCommentsByUserGroups(
+        groupIds
+      );
+    }
     if (privatePostsWithComments && publicPosts) {
       // összefűzzük a publikus posztokat a privát posztokkal
       resultPosts = privatePostsWithComments.concat(publicPosts);

@@ -9,6 +9,8 @@ import expressMySQLSession from "express-mysql-session";
 import path from "path";
 
 import initializePassport from "./strategies/local-strategy.js";
+import initializeGoogleStrategy from "./strategies/google-strategy.js";
+
 import authRoutes from "./routes/auth.js";
 import postRoutes from "./routes/posts.js";
 import userRoutes from "./routes/users.js";
@@ -65,6 +67,7 @@ app.use(bodyParser.json());
 app.use(cookieParser(cookieSecret));
 
 initializePassport(passport);
+initializeGoogleStrategy(passport);
 
 app.use(
   cors({
