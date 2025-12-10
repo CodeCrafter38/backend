@@ -5,6 +5,7 @@ Az SQL_queries mappából futtasuk le a query-ket a MySQL felületen a következ
 - create_tables.sql (ha még nem voltak korábban létrehozva a táblák)
 
 - data_reset.sql (ha volt már más adatokkal feltöltve az adatbázis)
+
   Ha ennek a futtatásakor jönne egy ilyen hiba a MySQL felületen:
   
   You are using safe update mode and you tried to update a table without a WHERE that uses a KEY column To disable safe mode, toggle the option ...
