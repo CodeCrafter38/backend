@@ -12,20 +12,20 @@ Az SQL_queries mappából futtasuk le a query-ket a MySQL felületen a következ
 
 Teszt felhasználók bejelentkezési adatai:
 
-alice:
+admin:
 
-felhasználónév: alice@example.com
+felhasználónév: admin@example.com
 
 jelszó: hashed_1
 
-jay:
+student:
 
-felhasználónév: jay@example.com
+felhasználónév: student@example.com
 
 jelszó: hashed_2
 
-bob:
+teacher:
 
-felhasználónév: bob@example.com
+felhasználónév: teacher@example.com
 
 jelszó: hashed_3

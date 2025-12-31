@@ -2,9 +2,9 @@ USE nexus_db;
 
 INSERT INTO users (username, email, password, role)
 VALUES 
-  ('alice', 'alice@example.com', '$2a$12$62TYYx8DfJF3e1l4oA6p/OOMV/qaqjble1EXXTs1OYuVNEvClV3j6', 'ADMIN'),
-  ('jay', 'jay@example.com', '$2a$12$yRUd9RelLLNGEBmnApgi6.qVhXWxk3q258lIjfIN2dCgVHvcmffMG', 'STUDENT'),
-  ('bob', 'bob@example.com', '$2a$12$hWL/JwZuJ6K1NvS/fDOvvePicIUumP0nyu6PBltOBDOnTgsvBPdQu', 'TEACHER');
+  ('admin', 'admin@example.com', '$2a$12$62TYYx8DfJF3e1l4oA6p/OOMV/qaqjble1EXXTs1OYuVNEvClV3j6', 'ADMIN'),
+  ('student', 'student@example.com', '$2a$12$yRUd9RelLLNGEBmnApgi6.qVhXWxk3q258lIjfIN2dCgVHvcmffMG', 'STUDENT'),
+  ('teacher', 'teacher@example.com', '$2a$12$hWL/JwZuJ6K1NvS/fDOvvePicIUumP0nyu6PBltOBDOnTgsvBPdQu', 'TEACHER');
 
 
 INSERT INTO groups_nexus (name, description, created_by)
