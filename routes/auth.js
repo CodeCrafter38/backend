@@ -1,4 +1,6 @@
 import express from "express";
+import path from "path";
+import fs from "fs";
 import bcrypt from "bcrypt";
 import passport from "passport";
 import {
@@ -10,6 +12,8 @@ import {
 } from "../helpers.js";
 
 const router = express.Router();
+const __dirname = path.resolve();
+const profilePicturesPath = path.join(__dirname, "profilePictures");
 
 router.get(
   "/auth/google",
@@ -74,7 +78,9 @@ router.get("/me", async (req, res) => {
     const foundUser = await findUserByEmail(req.session.passport.user);
     const username = foundUser.username;
     const role = foundUser.role;
-    res.json({ user: { username, role } });
+    const profilePicture = foundUser.profile_picture;
+
+    res.json({ user: { username, role, profilePicture } });
     //res.json({ user: req.session.passport.user });
     // res.status(200).send({ cookie: req.session.cookie });
   } else {

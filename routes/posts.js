@@ -4,11 +4,11 @@ import multer from "multer";
 import path from "path";
 import * as queries from "../database.js";
 
-const router = express.Router();
-
 const ALLOWED_EXTENSIONS = [".doc", ".docx", ".xls", ".xlsx"];
 const MAX_TOTAL_SIZE_MB = 100;
 const MAX_TOTAL_SIZE_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
+
+const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {

@@ -242,6 +242,22 @@ export async function getAdminUser() {
   }
 }
 
+export async function addProfilePicture(userid, file) {
+  const connection = await pool.getConnection();
+  try {
+    const fileInfo = JSON.stringify(file);
+    const [result] = await connection.query(
+      `UPDATE users SET profile_picture = ? WHERE id = ?`,
+      [fileInfo, userid]
+    );
+    return result;
+  } catch (e) {
+    throw new Error(e.message);
+  } finally {
+    connection.release();
+  }
+}
+
 export async function createUser(username, email, password, role) {
   const connection = await pool.getConnection();
   try {
