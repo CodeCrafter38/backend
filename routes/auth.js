@@ -18,6 +18,7 @@ router.get(
   })
 );
 
+//TODO: doksiba: googla cloud beállítással volt gond, a portokat egyeztetni kellett
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {

@@ -7,7 +7,7 @@ import * as queries from "../database.js";
 const router = express.Router();
 
 const ALLOWED_EXTENSIONS = [".doc", ".docx", ".xls", ".xlsx"];
-const MAX_TOTAL_SIZE_MB = 2;
+const MAX_TOTAL_SIZE_MB = 100;
 const MAX_TOTAL_SIZE_BYTES = MAX_TOTAL_SIZE_MB * 1024 * 1024;
 
 const storage = multer.diskStorage({
@@ -76,6 +76,7 @@ router.post(
         isPublic,
         selectedGroupIds,
         videoLink,
+        groupType,
       } = req.body;
 
       const uploadedFiles = req.files || [];
@@ -122,6 +123,7 @@ router.post(
       const user = await findUserByName(userName);
       const userId = user.id;
       if (userId) {
+        const teachersOnly = groupType === "TEACHER_ONLY";
         await addPost(
           title,
           content,
@@ -130,7 +132,8 @@ router.post(
           userId,
           groupIds,
           fileInfos.length ? fileInfos : null,
-          videoLink
+          videoLink,
+          teachersOnly === true ? 1 : 0
         );
         res.json({ msg: "Poszt létrehozás sikeres!" });
       } else {
@@ -147,8 +150,8 @@ router.post(
 router.delete("/", async (req, res) => {
   if (req.isAuthenticated()) {
     const { id } = req.query;
-    const posts = await queries.deletePost(id);
-    if (posts) {
+    const success = await queries.deletePost(id);
+    if (success) {
       res.status(204).send();
     } else {
       res.status(500).send("Adatbázis hiba történt a poszt törlésekor!");

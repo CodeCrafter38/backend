@@ -35,7 +35,7 @@ router.post("/create", async (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ msg: "Sikertelen azonosítás!" });
   }
-  const { name, description } = req.body;
+  const { name, description, teachersOnly } = req.body;
   const user = await findUserByEmail(req.session.passport.user);
 
   if (!name || !name.trim()) {
@@ -45,6 +45,7 @@ router.post("/create", async (req, res) => {
     const group = await addGroup(
       name.trim(),
       description?.trim() || "",
+      teachersOnly,
       user.id
     );
     res.status(201).json({ msg: "Csoport létrehozva!", group });
@@ -54,6 +55,29 @@ router.post("/create", async (req, res) => {
     } else {
       res.status(500).json({ msg: "Szerverhiba: " + e.message });
     }
+  }
+});
+
+router.delete("/", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+  }
+  const { groupName } = req.query;
+  try {
+    const group = await queries.getGroupByName(groupName);
+    if (!group) {
+      return res.status(404).json({ msg: "A törlendő csoport nem található!" });
+    }
+    const success = await queries.deleteGroup(group.id);
+    if (success) {
+      res.status(204).send();
+    } else {
+      res
+        .status(500)
+        .json({ msg: "Adatbázis hiba történt a csoport törlésekor!" });
+    }
+  } catch (e) {
+    res.status(500).json({ msg: "Csoport törlése sikertelen: " + e.message });
   }
 });
 

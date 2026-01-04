@@ -22,7 +22,7 @@ export async function getPosts() {
 
 export async function getPost(id) {
   const connection = await pool.getConnection();
-  // prepared statement (előkészített utasítás), afelhasználó által megadott értékeket
+  // prepared statement (előkészített utasítás), a felhasználó által megadott értékeket
   // az sql query-től külön küldjük be, és előfeldolgozza az adatbázis-engine az sql-injection elleni védelemhez
   const [rows] = await connection.query(`SELECT * FROM posts WHERE id = ?`, [
     id,
@@ -34,7 +34,7 @@ export async function getPost(id) {
 export async function getAllPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id GROUP BY p.id ORDER BY p.created_at DESC"
+    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id GROUP BY p.id ORDER BY p.created_at DESC"
   );
   connection.release();
   return rows;
@@ -43,7 +43,7 @@ export async function getAllPostsWithComments() {
 export async function getPublicPostsWithComments() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
+    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
   );
   connection.release();
   return rows;
@@ -71,7 +71,7 @@ export async function getPostsWithCommentsByUserGroups(groupIds) {
 
     // lekérdezzük a posztokat a kommentekkel együtt, és visszaadjuk
     const [rows] = await connection.query(
-      `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files,
+      `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only,
         JSON_ARRAYAGG(
           CASE
             WHEN c.id IS NOT NULL THEN JSON_OBJECT(
@@ -111,15 +111,16 @@ export async function createPost(
   visibility,
   labels,
   userId,
+  videoLink,
   fileInfos,
-  videoLink
+  teachersOnly
 ) {
   const connection = await pool.getConnection();
   let insertedPostId;
   try {
     const [result] = await connection.query(
-      `INSERT INTO posts (title, content, visibility, labels, user_id, video_link, files)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (title, content, visibility, labels, user_id, video_link, files, teachers_only)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         title,
         content,
@@ -128,6 +129,7 @@ export async function createPost(
         userId,
         videoLink,
         JSON.stringify(fileInfos),
+        teachersOnly,
       ]
     );
     insertedPostId = result.insertId;
@@ -190,7 +192,7 @@ export async function deletePost(id) {
       return true;
     }
   } catch (error) {
-    console.error("SQL hiba: ", error);
+    console.error("SQL hiba a poszt törlésekor: ", error);
     return false;
   } finally {
     connection.release();
@@ -209,8 +211,9 @@ export async function getUserById(id) {
 
 export async function getUserByName(username) {
   const connection = await pool.getConnection();
+  // TODO: case sensitive username keresés - BINARY megoldással - doksiban kifejteni
   const [rows] = await connection.query(
-    `SELECT * FROM users WHERE username = ?`,
+    `SELECT * FROM users WHERE BINARY username = BINARY ?`,
     [username]
   );
   connection.release();
@@ -228,11 +231,15 @@ export async function getUserByEmail(email) {
 
 export async function getAdminUser() {
   const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    "SELECT * FROM users WHERE role = ADMIN"
-  );
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await connection.query(
+      "SELECT * FROM users WHERE `role` = ? LIMIT 1",
+      ["ADMIN"]
+    );
+    return rows[0] ?? null;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function createUser(username, email, password, role) {
@@ -271,7 +278,7 @@ export async function updatePassword(userId, newPassword) {
 export async function getAllGroups() {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    "SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description FROM groups_nexus"
+    "SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM groups_nexus"
   );
   connection.release();
   return rows;
@@ -280,7 +287,7 @@ export async function getAllGroups() {
 export async function getGroupsOfUser(userId) {
   const connection = await pool.getConnection();
   const [rows] = await connection.query(
-    `SELECT groups_nexus.id, groups_nexus.name FROM user_groups
+    `SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM user_groups
     JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
     [userId]
   );
@@ -319,12 +326,12 @@ export async function getGroupByName(groupName) {
   return rows[0];
 }
 
-export async function createGroup(name, description, userId) {
+export async function createGroup(name, description, teachersOnly, userId) {
   const connection = await pool.getConnection();
   try {
     const [result] = await connection.query(
-      `INSERT INTO groups_nexus (name, description, created_by) VALUES (?, ?, ?)`,
-      [name, description, userId]
+      `INSERT INTO groups_nexus (name, description, teachers_only, created_by) VALUES (?, ?, ?, ?)`,
+      [name, description, teachersOnly, userId]
     );
     const insertedGroupId = result.insertId;
     connection.release();
@@ -336,6 +343,27 @@ export async function createGroup(name, description, userId) {
     }
   } catch (e) {
     throw new Error(e.message);
+  } finally {
+    connection.release();
+  }
+}
+
+export async function deleteGroup(id) {
+  const connection = await pool.getConnection();
+  try {
+    const [results] = await connection.query(
+      `DELETE FROM groups_nexus WHERE id = ?`,
+      [id]
+    );
+    if (results.affectedRows === 1) {
+      return true;
+    } else {
+      console.warn("A törlendő csoport nem található");
+      return true;
+    }
+  } catch (error) {
+    console.error("SQL hiba a csoport törlésekor!: ", error);
+    return false;
   } finally {
     connection.release();
   }

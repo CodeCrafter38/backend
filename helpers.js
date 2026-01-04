@@ -44,7 +44,8 @@ export async function addPost(
   userId,
   selectedGroupIds,
   fileInfos,
-  videoLink
+  videoLink,
+  teachersOnly
 ) {
   try {
     if (isPublic) {
@@ -55,7 +56,8 @@ export async function addPost(
         labels,
         userId,
         fileInfos,
-        videoLink
+        videoLink,
+        teachersOnly
       );
       if (!newPublicPost) {
         throw new Error("Publikus poszt létrehozása sikertelen!");
@@ -69,7 +71,8 @@ export async function addPost(
         labels,
         userId,
         fileInfos,
-        videoLink
+        videoLink,
+        teachersOnly
       );
       const newPostId = newPost.id;
       const mapSuccess = await queries.mapGroupsToPost(
@@ -120,7 +123,7 @@ export async function addUsersToGroup(groupName, usersToAdd) {
   if (!group) {
     throw new Error("A megadott csoport nem található!");
   }
-  const userIds = [];
+  const users = [];
   for (const username of usersToAdd) {
     const user = await queries.getUserByName(username);
     if (!user) {
@@ -128,8 +131,19 @@ export async function addUsersToGroup(groupName, usersToAdd) {
         `Legalább az egyik megadott felhasználó nem található: ${username}`
       );
     }
-    userIds.push(user.id);
+    users.push(user);
   }
+
+  if (group.teachers_only) {
+    for (const user of users) {
+      if (user.role !== "TEACHER" && user.role !== "ADMIN") {
+        throw new Error(
+          "A csoporthoz csak tanárt vagy admint lehet hozzáadni! Egy vagy több felhasználónak nincs megfelelő jogosultsága."
+        );
+      }
+    }
+  }
+  const userIds = users.map((user) => user.id);
   await queries.mapUsersToGroup(group.id, userIds);
   return;
 }
@@ -143,13 +157,18 @@ export async function removeUsersFromGroup(groupId) {
   }
 }
 
-export async function addGroup(name, description, userId) {
+export async function addGroup(name, description, teachersOnly, userId) {
   // Ellenőrizzük, hogy létezik-e már ilyen nevű csoport
   const existingGroup = await queries.getGroupByName(name);
   if (existingGroup) {
     throw new Error("A megadott csoportnév már foglalt!");
   }
-  const group = await queries.createGroup(name, description, userId);
+  const group = await queries.createGroup(
+    name,
+    description,
+    teachersOnly === true ? 1 : 0,
+    userId
+  );
   if (group) {
     const adminUser = await queries.getAdminUser();
     if (adminUser) {
@@ -157,7 +176,9 @@ export async function addGroup(name, description, userId) {
     } else {
       throw new Error("Admin felhasználó nem található!");
     }
-    await queries.mapUserToGroup(userId, group.id);
+    if (userId !== adminUser.id) {
+      await queries.mapUserToGroup(userId, group.id);
+    }
   } else {
     throw new Error("Csoport létrehozása sikertelen!");
   }
@@ -180,7 +201,7 @@ export async function getPostsWithComments(userName) {
 
     const groupIdsWithPostIds = await queries.getPostsOfGroups(groupIds);
 
-    if ((userRole === "TEACHER") | (userRole === "ADMIN")) {
+    if (userRole === "TEACHER" || userRole === "ADMIN") {
       // ha tanár vagy admin, akkor lekérdezzük az összes csoportot
       resultPosts = await queries.getAllPostsWithComments();
       if (resultPosts) {

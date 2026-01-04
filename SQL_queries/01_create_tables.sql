@@ -16,6 +16,7 @@ CREATE TABLE groups_nexus (
   id integer AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   description TEXT,
+  teachers_only BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   created_by integer NOT NULL,
   FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
