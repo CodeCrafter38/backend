@@ -131,8 +131,8 @@ router.post(
           labels,
           userId,
           groupIds,
-          fileInfos.length ? fileInfos : null,
           videoLink,
+          fileInfos.length ? fileInfos : null,
           teachersOnly === true ? 1 : 0
         );
         res.json({ msg: "Poszt létrehozás sikeres!" });

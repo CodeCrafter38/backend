@@ -43,8 +43,8 @@ export async function addPost(
   labels,
   userId,
   selectedGroupIds,
-  fileInfos,
   videoLink,
+  fileInfos,
   teachersOnly
 ) {
   try {
@@ -55,8 +55,8 @@ export async function addPost(
         "PUBLIC",
         labels,
         userId,
-        fileInfos,
         videoLink,
+        fileInfos,
         teachersOnly
       );
       if (!newPublicPost) {
@@ -70,8 +70,8 @@ export async function addPost(
         "PRIVATE",
         labels,
         userId,
-        fileInfos,
         videoLink,
+        fileInfos,
         teachersOnly
       );
       const newPostId = newPost.id;
