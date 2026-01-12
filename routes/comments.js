@@ -1,6 +1,6 @@
 import express from "express";
 import { createComment, getComments } from "../database.js";
-import { findUserByName, findUserByEmail } from "../helpers.js";
+import { findUserByEmail } from "../helpers.js";
 import * as queries from "../database.js";
 
 const router = express.Router();
@@ -23,6 +23,7 @@ router.post("/", async (req, res) => {
     }
     const userId = user.id;
     const { postId, content } = req.body;
+
     if (userId) {
       const comment = await createComment(content, postId, userId);
       res.json({ msg: "Komment hozzáadva a meagdott poszthoz!" }, comment);
@@ -36,32 +37,56 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.delete("/", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   if (req.isAuthenticated()) {
-    const { id } = req.query;
-    const user = await findUserByEmail(req.session.passport.user);
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Érvénytelen komment id!" });
+    }
 
-    const comment = await queries.getCommentById(id);
+    const user = await findUserByEmail(req.session.passport.user);
+    if (!user) {
+      return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+    }
+
+    const comment = await queries.getCommentById(userId);
     if (!comment) {
       return res.status(404).json({ error: "Komment nem található" });
     }
 
-    const createdAt = new Date(comment.createdAt);
+    const commentOwnerId = Number(comment.user_id);
+
+    if (user.role !== "ADMIN" && commentOwnerId !== user.id) {
+      return res
+        .status(403)
+        .json({ error: "Nincs jogosultságod a komment törlésére!" });
+    }
+
+    const createdAtRaw = comment.created_at ?? comment.createdAt;
+    const createdAt = new Date(createdAtRaw);
+
+    if (Number.isNaN(createdAt.getTime())) {
+      return res
+        .status(500)
+        .json({ error: "Hibás komment dátum az adatbázisban!" });
+    }
+
+    const ageMs = Date.now() - createdAt.getTime();
     const now = new Date();
-    if (now - createdAt > 60 * 1000 && user.role !== "ADMIN") {
+    if (user.role !== "ADMIN" && ageMs > 60_000) {
       return res
         .status(403)
         .json({ error: "1 perc után már nem törölhető a beküldött komment!" });
     }
 
-    const posts = await queries.deleteComment(id);
-    if (posts) {
+    const ok = await queries.deleteComment(userId);
+    if (ok) {
       res.status(204).send();
     } else {
       res.status(500).send("Adatbázis hiba történt a komment törlésekor!");
     }
   } else {
-    return res.status(401).send({ msg: "Sikertelen azonosítás!" });
+    return res.status(401).json({ msg: "Sikertelen azonosítás!" });
   }
 });
 

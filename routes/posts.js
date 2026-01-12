@@ -1,5 +1,10 @@
 import express from "express";
-import { findUserByName, addPost, getPostsWithComments } from "../helpers.js";
+import {
+  findUserByName,
+  findUserByEmail,
+  addPost,
+  getPostsWithComments,
+} from "../helpers.js";
 import multer from "multer";
 import path from "path";
 import * as queries from "../database.js";
@@ -147,14 +152,34 @@ router.post(
   }
 );
 
-router.delete("/", async (req, res) => {
+router.delete("/:id", async (req, res) => {
   if (req.isAuthenticated()) {
-    const { id } = req.query;
-    const success = await queries.deletePost(id);
-    if (success) {
-      res.status(204).send();
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(400).json({ error: "Érvénytelen poszt id!" });
+    }
+
+    const user = await findUserByEmail(req.session.passport.user);
+    if (!user) {
+      return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+    }
+
+    const adminUser = await queries.getAdminUser();
+    if (!adminUser) {
+      return res.status(500).send("Nem található admin felhasználó!");
+    }
+
+    if (user.id === adminUser.id) {
+      const success = await queries.deletePost(userId);
+      if (success) {
+        res.status(204).send();
+      } else {
+        res.status(500).send("Adatbázis hiba történt a poszt törlésekor!");
+      }
     } else {
-      res.status(500).send("Adatbázis hiba történt a poszt törlésekor!");
+      return res
+        .status(403)
+        .send({ msg: "Nincs jogosultsága a poszt törléséhez!" });
     }
   } else {
     return res.status(401).send({ msg: "Sikertelen azonosítás!" });

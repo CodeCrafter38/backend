@@ -17,16 +17,29 @@ const profilePicturesPath = path.join(__dirname, "profilePictures");
 
 router.get(
   "/auth/google",
+  (req, res, next) => {
+    const role = normalizeRole(req.query.role);
+
+    // elmentjük a választást a Google callback folyamatig
+    req.session.googleSignupRole = role;
+
+    // session mentése átirányítás előtt
+    req.session.save((err) => {
+      if (err) {
+        return next(err);
+      }
+      next();
+    });
+  },
   passport.authenticate("google", {
     scope: ["profile", "email"],
   })
 );
 
-//TODO: doksiba: googla cloud beállítással volt gond, a portokat egyeztetni kellett
 router.get(
   "/auth/google/callback",
   passport.authenticate("google", {
-    failureRedirect: "/login",
+    failureRedirect: "http://localhost:3000/login",
     failureMessage: "Google bejelentkezés sikertelen!",
   }),
   async (req, res) => {
@@ -46,22 +59,32 @@ router.post("/signup", async (req, res) => {
   const hashed = await bcrypt.hash(password, 10);
   const createdUser = await addUser(username, email, hashed, role);
   if (createdUser) {
-    res.json({ msg: "Felhasználó létrehozása sikeres" });
+    res.json({ msg: "Felhasználó létrehozása sikeres!" });
   } else {
     res.json({ msg: "Felhasználó létrehozása sikertelen!" });
   }
 });
 
-router.post(
-  "/login",
-  passport.authenticate("local", {
-    failureRedirect: "/login",
-    failureMessage: "Felhasználónév vagy jelszó nem egyezik!",
-  }),
-  async (req, res) => {
-    res.sendStatus(200);
-  }
-);
+router.post("/login", (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) {
+      return res.status(500).json({ msg: "Általános szerver hiba!" });
+    }
+
+    if (!user) {
+      return res
+        .status(401)
+        .json({ msg: info?.message ?? "Bejelentkezés sikertelen!" });
+    }
+
+    req.logIn(user, (loginErr) => {
+      if (loginErr) {
+        return res.status(500).json({ msg: "Szerver hiba (session)!" });
+      }
+      return res.sendStatus(200);
+    });
+  })(req, res, next);
+});
 
 router.get("/me", async (req, res) => {
   console.log("Session a posts-ban:\n", req.session);
@@ -76,15 +99,18 @@ router.get("/me", async (req, res) => {
   req.session.visited = true;
   if (req.isAuthenticated()) {
     const foundUser = await findUserByEmail(req.session.passport.user);
+    const userId = foundUser.id;
     const username = foundUser.username;
     const role = foundUser.role;
     const profilePicture = foundUser.profile_picture;
 
-    res.json({ user: { username, role, profilePicture } });
-    //res.json({ user: req.session.passport.user });
-    // res.status(200).send({ cookie: req.session.cookie });
+    const canChangePassword = !!req.user.password;
+
+    res.json({
+      user: { userId, username, role, profilePicture, canChangePassword },
+    });
   } else {
-    res.status(401).send("Sikertelen azonosítás!");
+    return res.status(401).json({ message: "Sikertelen azonosítás!" });
   }
 });
 
@@ -166,6 +192,13 @@ router.post("/change-password", async (req, res) => {
       return res.status(404).json({ msg: "A felhasználó nem található!" });
     }
 
+    // Google-fiókkal bejelentkezett felhasználó nem módosíthat jelszót (frontenden is védve van, de backenden is szükséges)
+    if (!req.user.password) {
+      return res.status(403).json({
+        msg: "Google-fiókkal bejelentkezett felhasználó nem módosíthat jelszót.",
+      });
+    }
+
     if (!(await bcrypt.compare(String(oldPassword), String(user.password)))) {
       return res.status(403).json({ msg: "Érvénytelen régi jelszó!" });
     }
@@ -180,5 +213,10 @@ router.post("/change-password", async (req, res) => {
     });
   }
 });
+
+function normalizeRole(raw) {
+  const r = String(raw ?? "").toUpperCase();
+  return r === "TEACHER" || r === "STUDENT" ? r : "STUDENT";
+}
 
 export default router;

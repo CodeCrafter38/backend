@@ -7,16 +7,26 @@ export default function initialize(passport) {
     new Strategy({ usernameField: "email" }, async (email, password, done) => {
       try {
         const foundUser = await findUserByEmail(email);
-        if (!foundUser) throw new Error("Felhasználó nem található!");
-        if (
-          await bcrypt.compare(String(password), String(foundUser.password))
-        ) {
-          done(null, foundUser);
-        } else {
-          throw new Error("Felhasználónév vagy jelszó nem egyezik!");
+
+        if (!foundUser) {
+          return done(null, false, {
+            message: "Felhasználónév vagy jelszó nem egyezik!",
+          });
         }
-      } catch (e) {
-        done(e, null);
+
+        const ok = await bcrypt.compare(
+          String(password),
+          String(foundUser.password)
+        );
+        if (!ok) {
+          return done(null, false, {
+            message: "Felhasználónév vagy jelszó nem egyezik!",
+          });
+        }
+
+        return done(null, foundUser);
+      } catch (err) {
+        return done(err);
       }
     })
   );
@@ -25,10 +35,10 @@ export default function initialize(passport) {
 
   passport.deserializeUser(async (email, done) => {
     try {
-      const user = findUserByEmail(email);
-      done(null, user);
+      const user = await findUserByEmail(email); // <- hiányzott az await
+      return done(null, user);
     } catch (e) {
-      done(e, null);
+      return done(e);
     }
   });
 }
