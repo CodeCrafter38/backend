@@ -22,8 +22,8 @@ VALUES
 
 INSERT INTO posts (title, content, visibility, user_id, teachers_only)
 VALUES 
-  ('Why I Love MySQL', 'It is fast and reliable for most use cases.', PUBLIC, 1, 0),
-  ('Building machines With Passion', 'How to build consistently every day.', PUBLIC, 2, 0);
+  ('Why I Love MySQL', 'It is fast and reliable for most use cases.', 'PUBLIC', 1, 0),
+  ('Building machines With Passion', 'How to build consistently every day.', 'PUBLIC', 2, 0);
 
 
 INSERT INTO comments (content, post_id, user_id)

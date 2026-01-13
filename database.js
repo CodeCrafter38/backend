@@ -9,53 +9,58 @@ const pool = mysql
     user: process.env.MYSQL_USER,
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
-    multipleStatements: true,
+    multipleStatements: false,
   })
   .promise();
 
 export async function getPosts() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query("SELECT * FROM posts");
-  connection.release();
-  return rows;
+  try {
+    const [rows] = await pool.execute("SELECT * FROM posts");
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getPost(id) {
-  const connection = await pool.getConnection();
   // prepared statement (előkészített utasítás), a felhasználó által megadott értékeket
   // az sql query-től külön küldjük be, és előfeldolgozza az adatbázis-engine az sql-injection elleni védelemhez
-  const [rows] = await connection.query(`SELECT * FROM posts WHERE id = ?`, [
-    id,
-  ]);
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(`SELECT * FROM posts WHERE id = ?`, [id]);
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getAllPostsWithComments() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id GROUP BY p.id ORDER BY p.created_at DESC"
-  );
-  connection.release();
-  return rows;
+  try {
+    const [rows] = await pool.execute(
+      "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id GROUP BY p.id ORDER BY p.created_at DESC"
+    );
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getPublicPostsWithComments() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
-  );
-  connection.release();
-  return rows;
+  try {
+    const [rows] = await pool.execute(
+      "SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only, JSON_ARRAYAGG(CASE WHEN c.id IS NOT NULL THEN JSON_OBJECT('id',c.id, 'content',c.content, 'created_at',c.created_at, 'user_id',c.user_id) ELSE JSON_OBJECT('content', NULL) END ) AS comments FROM posts p LEFT JOIN comments c ON c.post_id = p.id WHERE p.visibility = 'PUBLIC' GROUP BY p.id ORDER BY p.created_at DESC"
+    );
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getPostsWithCommentsByUserGroups(groupIds) {
+  if (!groupIds?.length) return [];
   const resultPosts = [];
-  const connection = await pool.getConnection();
-  await connection.beginTransaction();
   // lekérdezzük a felhasználó csoportjai alapján az összes posztot, minden posztot csak egyszer (distinct)
   try {
-    const [postRows] = await connection.query(
+    const [postRows] = await pool.execute(
       `SELECT DISTINCT p.id
       FROM posts p
       JOIN post_groups pg ON p.id = pg.post_id
@@ -70,7 +75,7 @@ export async function getPostsWithCommentsByUserGroups(groupIds) {
     }
 
     // lekérdezzük a posztokat a kommentekkel együtt, és visszaadjuk
-    const [rows] = await connection.query(
+    const [rows] = await pool.execute(
       `SELECT p.id, p.title, p.content, p.labels, p.created_at, p.user_id, p.video_link, p.files, p.teachers_only,
         JSON_ARRAYAGG(
           CASE
@@ -90,19 +95,13 @@ export async function getPostsWithCommentsByUserGroups(groupIds) {
       ORDER BY p.created_at DESC`,
       [postIds]
     );
-    await connection.commit();
-    console.log("Posztok csoportonkénti lekérdezésének tranzakciója sikeres.");
+    console.log("Posztok csoportonkénti lekérdezése sikeres.");
     return rows;
   } catch (err) {
-    await connection.rollback();
-    console.error(
-      "Posztok csoportonkénti lekérdezésének tranzakciója sikertelen!",
-      err
-    );
-  } finally {
-    connection.release();
+    console.error("Posztok csoportonkénti lekérdezése sikertelen!", err);
+
+    return resultPosts;
   }
-  return resultPosts;
 }
 
 export async function createPost(
@@ -115,10 +114,8 @@ export async function createPost(
   fileInfos,
   teachersOnly
 ) {
-  const connection = await pool.getConnection();
-  let insertedPostId;
   try {
-    const [result] = await connection.query(
+    const [result] = await pool.execute(
       `INSERT INTO posts (title, content, visibility, labels, user_id, video_link, files, teachers_only)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -132,57 +129,34 @@ export async function createPost(
         teachersOnly,
       ]
     );
-    insertedPostId = result.insertId;
-    connection.release();
-    try {
-      const newPost = await getPost(insertedPostId);
-      return newPost;
-    } catch (e) {
-      throw new Error(e.message);
-    }
+
+    return await getPost(result.insertId);
   } catch (e) {
     throw new Error(e.message);
-  } finally {
-    connection.release();
   }
 }
 
 export async function mapGroupsToPost(postId, groupIds) {
-  if (groupIds) {
-    const connection = await pool.getConnection();
-    try {
-      groupIds.forEach(async (groupId) => {
-        await connection.query(
-          `INSERT INTO post_groups (post_id, group_id) VALUES (?, ?)`,
+  if (!groupIds?.length) return true;
+
+  try {
+    await Promise.all(
+      groupIds.map((groupId) =>
+        pool.execute(
+          "INSERT INTO post_groups (post_id, group_id) VALUES (?, ?)",
           [postId, groupId]
-        );
-      });
-      return "Poszt csoportokhoz rendelése sikeres";
-    } catch (e) {
-      throw new Error(e.message);
-    } finally {
-      connection.release();
-    }
-  } else {
-    return undefined;
+        )
+      )
+    );
+    return true;
+  } catch (e) {
+    throw new Error(e.message);
   }
 }
 
-export async function updatePost(id, title, content) {
-  const connection = await pool.getConnection();
-  const [result] = await connection.query(
-    `UPDATE posts SET title = ?, content = ? WHERE id = ?`,
-    [id, title, content]
-  );
-  connection.release();
-  const resultId = result.insertId;
-  return await getPost(resultId);
-}
-
 export async function deletePost(id) {
-  const connection = await pool.getConnection();
   try {
-    const [results] = await connection.query(`DELETE FROM posts WHERE id = ?`, [
+    const [results] = await pool.execute(`DELETE FROM posts WHERE id = ?`, [
       id,
     ]);
     if (results.affectedRows === 1) {
@@ -191,183 +165,181 @@ export async function deletePost(id) {
       console.warn("A törlendő poszt nem található");
       return true;
     }
-  } catch (error) {
-    console.error("SQL hiba a poszt törlésekor: ", error);
-    return false;
-  } finally {
-    connection.release();
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function getUserById(id) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `SELECT username FROM users WHERE id = ?`,
-    [id]
-  );
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT username FROM users WHERE id = ?`,
+      [id]
+    );
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getUserByName(username) {
-  const connection = await pool.getConnection();
   // TODO: case sensitive username keresés - BINARY megoldással - doksiban kifejteni
-  const [rows] = await connection.query(
-    `SELECT * FROM users WHERE BINARY username = BINARY ?`,
-    [username]
-  );
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT * FROM users WHERE BINARY username = BINARY ?`,
+      [username]
+    );
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getUserByEmail(email) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(`SELECT * FROM users WHERE email = ?`, [
-    email,
-  ]);
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(`SELECT * FROM users WHERE email = ?`, [
+      email,
+    ]);
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getAdminUser() {
-  const connection = await pool.getConnection();
   try {
-    const [rows] = await connection.query(
+    const [rows] = await pool.execute(
       "SELECT * FROM users WHERE `role` = ? LIMIT 1",
       ["ADMIN"]
     );
     return rows[0] ?? null;
-  } finally {
-    connection.release();
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function addProfilePicture(userid, file) {
-  const connection = await pool.getConnection();
   try {
     const fileInfo = JSON.stringify(file);
-    const [result] = await connection.query(
+    const [result] = await pool.execute(
       `UPDATE users SET profile_picture = ? WHERE id = ?`,
       [fileInfo, userid]
     );
     return result;
   } catch (e) {
-    throw new Error(e.message);
-  } finally {
-    connection.release();
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function createUser(username, email, password, role) {
-  const connection = await pool.getConnection();
   try {
-    const [result] = await connection.query(
+    const [result] = await pool.execute(
       `INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)`,
       [username, email, password, role]
     );
-    connection.release();
-    const id = result.insertId;
-    return await getUserById(id);
+    return await getUserById(result.insertId);
   } catch (e) {
-    throw new Error(e.message);
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function updateUsername(userId, newUsername) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `UPDATE users SET username = ? WHERE id = ?`,
-    [newUsername, userId]
-  );
-  return [rows];
+  try {
+    const [result] = await pool.execute(
+      `UPDATE users SET username = ? WHERE id = ?`,
+      [newUsername, userId]
+    );
+    return [result];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function updatePassword(userId, newPassword) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
+  const [result] = await pool.execute(
     `UPDATE users SET password = ? WHERE id = ?`,
     [newPassword, userId]
   );
-  return [rows];
+  return [result];
 }
 
 export async function getAllGroups() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    "SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM groups_nexus"
-  );
-  connection.release();
-  return rows;
+  try {
+    const [rows] = await pool.execute(
+      "SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM groups_nexus"
+    );
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getGroupsOfUser(userId) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM user_groups
+  try {
+    const [rows] = await pool.execute(
+      `SELECT groups_nexus.id, groups_nexus.name, groups_nexus.description, groups_nexus.created_at, groups_nexus.created_by, groups_nexus.teachers_only FROM user_groups
     JOIN groups_nexus ON user_groups.group_id=groups_nexus.id WHERE user_id = ?`,
-    [userId]
-  );
-  connection.release();
-  return rows;
+      [userId]
+    );
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getUsersOfGroup(groupId) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `SELECT users.id, users.username, users.role FROM user_groups
+  try {
+    const [rows] = await pool.execute(
+      `SELECT users.id, users.username, users.role FROM user_groups
     JOIN users ON user_groups.user_id=users.id WHERE group_id = ?`,
-    [groupId]
-  );
-  connection.release();
-  return rows;
+      [groupId]
+    );
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getGroup(id) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `SELECT * FROM groups_nexus WHERE id = ?`,
-    [id]
-  );
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT * FROM groups_nexus WHERE id = ?`,
+      [id]
+    );
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getGroupByName(groupName) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(
-    `SELECT * FROM groups_nexus WHERE name = ?`,
-    [groupName]
-  );
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(
+      `SELECT * FROM groups_nexus WHERE name = ?`,
+      [groupName]
+    );
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function createGroup(name, description, teachersOnly, userId) {
-  const connection = await pool.getConnection();
   try {
-    const [result] = await connection.query(
+    const [result] = await pool.execute(
       `INSERT INTO groups_nexus (name, description, teachers_only, created_by) VALUES (?, ?, ?, ?)`,
       [name, description, teachersOnly, userId]
     );
-    const insertedGroupId = result.insertId;
-    connection.release();
-    try {
-      const newGroup = await getGroup(insertedGroupId);
-      return newGroup;
-    } catch (e) {
-      throw new Error(e.message);
-    }
+
+    return await getGroup(result.insertId);
   } catch (e) {
-    throw new Error(e.message);
-  } finally {
-    connection.release();
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function deleteGroup(id) {
-  const connection = await pool.getConnection();
   try {
-    const [results] = await connection.query(
+    const [results] = await pool.execute(
       `DELETE FROM groups_nexus WHERE id = ?`,
       [id]
     );
@@ -378,93 +350,62 @@ export async function deleteGroup(id) {
       return true;
     }
   } catch (error) {
-    console.error("SQL hiba a csoport törlésekor!: ", error);
-    return false;
-  } finally {
-    connection.release();
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function mapUserToGroup(userId, groupId) {
-  const connection = await pool.getConnection();
+  if (!userId?.length) return "Felhasználó csoporthoz rendelése sikeres";
   try {
-    const [result] = await connection.query(
+    await pool.execute(
       `INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)`,
       [userId, groupId]
     );
-    const id = result.insertId;
     return "Felhasználó csoporthoz rendelése sikeres";
   } catch (e) {
-    throw new Error(e.message);
-  } finally {
-    connection.release();
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function mapUsersToGroup(groupId, userIds) {
-  const connection = await pool.getConnection();
+  if (!userIds?.length) return "Felhasználók csoporthoz rendelése sikeres";
   try {
-    userIds.forEach(async (userId) => {
-      await connection.query(
-        `INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)`,
-        [userId, groupId]
-      );
-    });
+    await Promise.all(
+      userIds.map((userId) =>
+        pool.execute(
+          "INSERT INTO user_groups (user_id, group_id) VALUES (?, ?)",
+          [userId, groupId]
+        )
+      )
+    );
     return "Felhasználók csoporthoz rendelése sikeres";
   } catch (e) {
-    throw new Error(e.message);
-  } finally {
-    connection.release();
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function getPostsOfGroups(groupIds) {
-  if (groupIds) {
-    const connection = await pool.getConnection();
-    try {
-      let groupIdsWithPostIds = [];
-      groupIds.forEach(async (groupId) => {
-        const [postRows] = await connection.query(
-          `SELECT post_id
-          FROM post_groups
-          WHERE group_id = ?`,
+  if (!groupIds?.length) return undefined;
+
+  try {
+    const results = await Promise.all(
+      groupIds.map(async (groupId) => {
+        const [postRows] = await pool.execute(
+          "SELECT post_id FROM post_groups WHERE group_id = ?",
           [groupId]
         );
-        groupIdsWithPostIds.push({
-          groupId,
-          postIds: postRows.map((row) => row.post_id),
-        });
-      });
-      return groupIdsWithPostIds;
-    } catch (e) {
-      throw new Error(e.message);
-    } finally {
-      connection.release();
-    }
-  } else {
-    return undefined;
-  }
-}
-
-export async function addUserToGroup(userId, groupId) {
-  const connection = await pool.getConnection();
-  try {
-    const [result] = await connection.query(
-      `INSERT INTO user_groups VALUES (?, ?)`,
-      [userId, groupId]
+        return { groupId, postIds: postRows.map((r) => r.post_id) };
+      })
     );
-    connection.release();
-    const id = result.insertId;
-    return await getCommentById(id);
+    return results;
   } catch (e) {
-    throw new Error(e.message);
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function deleteUserFromGroup(userId, groupId) {
-  const connection = await pool.getConnection();
   try {
-    const [results] = await connection.query(
+    const [results] = await pool.execute(
       `DELETE FROM user_groups WHERE user_id = ? AND group_id = ?`,
       [userId, groupId]
     );
@@ -474,62 +415,55 @@ export async function deleteUserFromGroup(userId, groupId) {
       console.warn("A törlendő felhasználó vagy a csoport nem található");
       return true;
     }
-  } catch (error) {
-    console.error("SQL hiba: ", error);
-    return false;
-  } finally {
-    connection.release();
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function getComments() {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query("SELECT * FROM comments");
-  connection.release();
-  return rows;
+  try {
+    const [rows] = await pool.execute("SELECT * FROM comments");
+    return rows;
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function getCommentById(id) {
-  const connection = await pool.getConnection();
-  const [rows] = await connection.query(`SELECT * FROM comments WHERE id = ?`, [
-    id,
-  ]);
-  connection.release();
-  return rows[0];
+  try {
+    const [rows] = await pool.execute(`SELECT * FROM comments WHERE id = ?`, [
+      id,
+    ]);
+    return rows[0];
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
+  }
 }
 
 export async function createComment(content, postId, userId) {
-  const connection = await pool.getConnection();
   try {
-    const [result] = await connection.query(
-      `INSERT INTO comments (content, post_id, user_id) VALUES (?, ?, ?)`,
+    const [result] = await pool.execute(
+      "INSERT INTO comments (content, post_id, user_id) VALUES (?, ?, ?)",
       [content, postId, userId]
     );
-    connection.release();
-    const id = result.insertId;
-    return await getCommentById(id);
+    return await getCommentById(result.insertId);
   } catch (e) {
-    throw new Error(e.message);
+    throw new Error(e.message, { cause: e });
   }
 }
 
 export async function deleteComment(id) {
-  const connection = await pool.getConnection();
   try {
-    const [results] = await connection.query(
-      `DELETE FROM comments WHERE id = ?`,
-      [id]
-    );
+    const [results] = await pool.execute(`DELETE FROM comments WHERE id = ?`, [
+      id,
+    ]);
     if (results.affectedRows === 1) {
       return true;
     } else {
       console.warn("A törlendő komment nem található");
       return true;
     }
-  } catch (error) {
-    console.error("SQL hiba: ", error);
-    return false;
-  } finally {
-    connection.release();
+  } catch (e) {
+    throw new Error(e.message, { cause: e });
   }
 }

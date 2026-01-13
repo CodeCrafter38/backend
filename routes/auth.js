@@ -187,7 +187,7 @@ router.post("/change-password", async (req, res) => {
   const { oldPassword, newPassword } = req.body;
   try {
     // megkeressük a bejelentkezett felhasználót
-    const user = await findUserByName(req.session.passport.user);
+    const user = await findUserByEmail(req.session.passport.user);
     if (!user) {
       return res.status(404).json({ msg: "A felhasználó nem található!" });
     }

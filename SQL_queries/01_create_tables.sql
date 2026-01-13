@@ -13,7 +13,7 @@ CREATE TABLE users (
 
 
 CREATE TABLE groups_nexus (
-  id integer AUTO_INCREMENT PRIMARY KEY,
+  id integer PRIMARY KEY AUTO_INCREMENT,
   name VARCHAR(255) NOT NULL,
   description TEXT,
   teachers_only BOOLEAN NOT NULL DEFAULT FALSE,

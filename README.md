@@ -16,11 +16,11 @@ Az SQL_queries mappából futtasuk le a query-ket a MySQL felületen a következ
 
 - 03_reset_auto_increment_sql (ha volt már más adatokkal feltöltve az adatbázis)
 
-- 04_extend_posts.sql
+- 04_extend_posts.sql (ha most először lettek létrehozva a táblák)
 
-- 05_extend_groups_nexus.sql
+- 05_extend_groups_nexus.sql (ha most először lettek létrehozva a táblák)
 
-- 06_add_profile_pictures_to_users.sql
+- 06_add_profile_pictures_to_users.sql (ha most először lettek létrehozva a táblák)
 
 - 07_seed.sql
 
