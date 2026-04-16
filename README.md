@@ -24,6 +24,8 @@ Az SQL_queries mappából futtasuk le a query-ket a MySQL felületen a következ
 
 - 07_seed.sql
 
+- 08_add_theme_palette.sql
+
 Teszt felhasználók bejelentkezési adatai:
 
 admin:

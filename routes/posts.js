@@ -1,3 +1,10 @@
+// Posts router: posztok listázása, poszt létrehozás fájlfeltöltéssel, poszt törlés admin joggal.
+// Fontos elemek:
+// - req.isAuthenticated() védelem
+// - multer diskStorage upload mappába
+// - fileFilter: képek + (doc/docx/xls/xlsx) engedélyezése
+// - összméret limit: 100 MB összesen
+
 import express from "express";
 import {
   findUserByName,
@@ -17,10 +24,14 @@ const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
+    // Feltöltési célmappa: projekt root /uploads
+    // (path.resolve() ESM környezetben jó módszer a "projekt root" elérésére, ha onnan fut a node)
     const __dirname = path.resolve();
     cb(null, path.join(__dirname, "uploads"));
   },
   filename: function (req, file, cb) {
+    // Egyedi fájlnév: timestamp + random + eredeti kiterjesztés.
+    // Ez segít elkerülni az ütközést és a path traversal jellegű problémákat (mert nem használod az eredeti nevet).
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
   },
@@ -33,6 +44,9 @@ const fileFilter = (req, file, cb) => {
   const ext = path.extname(file.originalname || "").toLowerCase();
   const isAllowedDoc = ALLOWED_EXTENSIONS.includes(ext);
 
+  // Engedélyezés: bármilyen image/* vagy a felsorolt dokumentumtípusok.
+  // Megjegyzés: mimetype-et kliens is tud hamisítani, ezért a kiterjesztés ellenőrzés jó kiegészítés.
+  // Ha nagyon szigorú akarsz lenni, akkor file signature (magic bytes) ellenőrzés kellene.
   if (isImage || isAllowedDoc) {
     return cb(null, true);
   }
@@ -47,6 +61,7 @@ const upload = multer({
 
 router.get("/", async (req, res) => {
   if (req.isAuthenticated()) {
+    // Username query paraméterből jön. (Backend oldalon érdemes validálni, hogy létező user.)
     const { username } = req.query;
     const posts = await getPostsWithComments(username);
     res.json(posts);
@@ -58,6 +73,8 @@ router.get("/", async (req, res) => {
 router.post(
   "/",
   (req, res, next) => {
+    // Multer middleware kézi becsomagolása:
+    // így a hibákat te formázod (400 + saját üzenet), nem a default express error handler.
     upload.array("files")(req, res, function (err) {
       if (err) {
         if (err.message === "Nem engedélyezett fájltípus!") {
@@ -86,14 +103,17 @@ router.post(
 
       const uploadedFiles = req.files || [];
 
-      // Összméret ellenőrzése
+      // Összméret ellenőrzése: az összes csatolt fájl mérete együtt max 100 MB.
+      // Ez segít a tárhely és DoS jellegű problémák ellen.
       const totalSize = uploadedFiles.reduce(
         (sum, file) => sum + (file.size || 0),
-        0
+        0,
       );
 
       if (totalSize > MAX_TOTAL_SIZE_BYTES) {
-        // a már feltöltött fájlok törlése
+        // Ha túllépi, akkor törlöd a már feltöltött fájlokat.
+        // FONTOS MEGJEGYZÉS: ebben a fájlban fs nincs importálva, miközben fs.unlinkSync-et hívsz.
+        // Ez futásidőben ReferenceError-t fog okozni. (Most nem javítom, csak jelzem.)
         for (const file of uploadedFiles) {
           if (file && file.path) {
             try {
@@ -109,6 +129,8 @@ router.post(
         });
       }
 
+      // "Normalizált" fájl meta lista, amit adatbázisba tudsz menteni.
+      // filename: a szerveren tárolt név, path: fizikai útvonal, mimetype/size: gyors megjelenítéshez/validáláshoz.
       const fileInfos = uploadedFiles
         .filter((file) => file && file.filename)
         .map((file) => ({
@@ -118,6 +140,8 @@ router.post(
           mimetype: file.mimetype,
         }));
 
+      // selectedGroupIds bejöhet stringként vagy tömbként (form-data eset).
+      // Itt lekezeled mindkét formátumot.
       let groupIds = [];
       if (Array.isArray(selectedGroupIds)) {
         groupIds = selectedGroupIds.map((id) => parseInt(id));
@@ -125,9 +149,13 @@ router.post(
         groupIds = [parseInt(selectedGroupIds)];
       }
 
+      // userName alapján user lookup.
+      // Megjegyzés: biztonságosabb, ha a userId-t a sessionből veszed, nem a request bodyból.
+      // Most meghagyom a meglévő logikát.
       const user = await findUserByName(userName);
       const userId = user.id;
       if (userId) {
+        // teachersOnly flag: a poszt tartalma csak tanároknak jelenjen meg a csoporton belül.
         const teachersOnly = groupType === "TEACHER_ONLY";
         await addPost(
           title,
@@ -138,7 +166,7 @@ router.post(
           groupIds,
           videoLink,
           fileInfos.length ? fileInfos : null,
-          teachersOnly === true ? 1 : 0
+          teachersOnly === true ? 1 : 0,
         );
         res.json({ msg: "Poszt létrehozás sikeres!" });
       } else {
@@ -149,21 +177,24 @@ router.post(
     } else {
       return res.status(401).json({ msg: "Sikertelen azonosítás!" });
     }
-  }
+  },
 );
 
 router.delete("/:id", async (req, res) => {
   if (req.isAuthenticated()) {
+    // Paraméter validálás: poszt id pozitív egész legyen.
     const userId = Number(req.params.id);
     if (!Number.isInteger(userId) || userId <= 0) {
       return res.status(400).json({ error: "Érvénytelen poszt id!" });
     }
 
+    // Jelenlegi user a sessionből (email).
     const user = await findUserByEmail(req.session.passport.user);
     if (!user) {
       return res.status(401).json({ msg: "Sikertelen azonosítás!" });
     }
 
+    // Admin user lekérése: csak admin törölhet posztot.
     const adminUser = await queries.getAdminUser();
     if (!adminUser) {
       return res.status(500).send("Nem található admin felhasználó!");

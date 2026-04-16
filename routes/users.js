@@ -1,5 +1,10 @@
 import express from "express";
-import { findUserByName, getUsersOfGroup } from "../helpers.js";
+import {
+  findUserByName,
+  findUserByEmail,
+  getUsersOfGroup,
+  saveUserTheme,
+} from "../helpers.js";
 import { addProfilePicture } from "../database.js";
 import multer from "multer";
 import path from "path";
@@ -95,7 +100,7 @@ router.post(
               console.error(
                 "Nem sikerült törölni a fájlt:",
                 uploadedFile.path,
-                e
+                e,
               );
             }
           }
@@ -129,7 +134,7 @@ router.post(
             console.error(
               "Nem sikerült törölni a fájlt:",
               uploadedFile.path,
-              e
+              e,
             );
           }
         }
@@ -144,7 +149,7 @@ router.post(
     } catch (e) {
       return res.status(500).json({ msg: "Szerver hiba!", error: e?.message });
     }
-  }
+  },
 );
 
 router.delete("/remove-profile-picture", async (req, res) => {
@@ -166,6 +171,38 @@ router.delete("/remove-profile-picture", async (req, res) => {
     return res.json({ msg: "Profilkép törlése sikeres!" });
   } catch (e) {
     return res.status(500).json({ msg: "Szerver hiba!", error: e?.message });
+  }
+});
+
+router.patch("/theme", async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ msg: "Sikertelen azonosítás!" });
+    }
+
+    const allowedModes = ["light", "dark"];
+    const allowedPalettes = ["nexus", "ocean", "forest", "plum"];
+
+    const { themeMode, themePalette } = req.body;
+
+    if (!allowedModes.includes(themeMode)) {
+      return res.status(400).json({ msg: "Érvénytelen téma mód!" });
+    }
+
+    if (!allowedPalettes.includes(themePalette)) {
+      return res.status(400).json({ msg: "Érvénytelen színpaletta!" });
+    }
+
+    const user = await findUserByEmail(req.session.passport.user);
+    if (!user) {
+      return res.status(404).json({ msg: "Felhasználó nem található!" });
+    }
+
+    await saveUserTheme(user.id, themeMode, themePalette);
+
+    return res.json({ msg: "Téma mentve." });
+  } catch (e) {
+    return res.status(500).json({ msg: "Szerver hiba!", error: e.message });
   }
 });
 
